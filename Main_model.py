@@ -111,7 +111,7 @@ if __name__ == '__main__':
     w0 = w0 / 180 * np.pi
 
     # тензор инерции (данные из документации, не менять)
-    I = np.array([[337.94, 25.6, 3.2], [25.6, 9283.9, 19.6], [3.2, 19.6, 10578.5]])
+    I = np.array([[3337.94, 25.6, 3.2], [25.6, 9283.9, 19.6], [3.2, 19.6, 10578.5]])
 
     [t, x, H_out] = runge_kutta(t_span, dt, w0, M, I)
     # sol = solve_ivp(f, t_span, w0, 'RK45', t_eval, args=(M, H, HH, I), dense_output=True)
@@ -131,17 +131,18 @@ if __name__ == '__main__':
         x[5, i] = x[5, i] / np.pi * 180
 
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4,1)
-    ax1.plot(t, x[0,:], label="wx, град/с")
-    ax1.plot(t, x[1,:], label="wy, град/с")
-    ax1.plot(t, x[2,:], label="wz, град/с")
-    ax1.set_title("Изменение угловых скоростей")
+
+    ax1.plot(t, x[3, :], label="gamma, град")
+    ax1.plot(t, x[4, :], label="theta, град")
+    ax1.plot(t, x[5, :], label="psi, град")
+    ax1.set_title("Изменение углов")
     ax1.legend()
     ax1.grid(True)
 
-    ax2.plot(t, x[3,:], label="gamma, град")
-    ax2.plot(t, x[4,:], label="theta, град")
-    ax2.plot(t, x[5,:], label="psi, град")
-    ax2.set_title("Изменение углов")
+    ax2.plot(t, x[0,:], label="wx, град/с")
+    ax2.plot(t, x[1,:], label="wy, град/с")
+    ax2.plot(t, x[2,:], label="wz, град/с")
+    ax2.set_title("Изменение угловых скоростей")
     ax2.legend()
     ax2.grid(True)
 
