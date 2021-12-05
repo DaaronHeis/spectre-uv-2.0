@@ -6,7 +6,7 @@
 import numpy as np
 
 """
-    Константы
+    Константы, относящиеся ко всему комплексу
 """
 
 # угол установки ДМ
@@ -15,29 +15,15 @@ alpha = 20.0 / 180 * np.pi
 # количество ДМ
 N = 4
 
-# минимальный кинетический момент (Нмс)
-Hm = -40.0
-# максимальный кинетический момент (Нмс)
-Hp = 40.0
-
 # минимальный электромагнитный момент (Нм)
 Mem_min = -0.20
 # максимальный электромагнитный момент (Нм)
 Mem_max = 0.20
 
-# момент сопротивления (Нм; берется максимальный)
-Mc = 0.012
 
 # коэффициенты управления
 k_angle = 0.02
 k_velocity = 1
-
-# коэффициенты насыщения и инерционности
-k_saturation = 1
-HH_max = 1
-
-# демпфирующий коэффициент
-c = 0
 
 
 """
@@ -49,36 +35,45 @@ class Flywheel:
 
     def __init__(self, w_self, H, HH, Md):
 
+        # динамические параметры ДМ
         self.J = 1000           # момент инерции
         self.w_self = w_self    # собственная скорость вращения ДМ
         self.H = H              # собственный кин. момент ДМ
         self.HH = HH            # собственная скорость изменения кин. момента ДМ
         self.Md = Md            # получающийся динамический момент ДМ
 
+        # неизменяющиеся параметры ДМ
+        self.c = 0              # демпфирующий коэффициент
+        self.k_saturation = 1   # коэффициент насыщения
+        self.HH_max = 1         # коэффициент инерционности
+        self.Mc = 0.012         # момент сопротивления (Нм; берется максимальный)
+        self.Hm = -40           # минимальный кинетический момент (Нмс)
+        self.Hp = 40            # максимальный кинетический момент (Нмс)
+
     # на вход нужно подавать уже приведенные к оси ДМ величины
     def change(self, Mem):
 
         # скорость изменения кинетического момента
-        self.HH = Mem - Mc*np.sign(self.w_self) - c*self.w_self
+        self.HH = Mem - self.Mc*np.sign(self.w_self) - self.c*self.w_self
         self.w_self = self.w_self + self.HH/self.J
 
         # инерционность
-        if self.HH > HH_max:
-            self.HH = HH_max
-        if self.HH < -HH_max:
-            self.HH = -HH_max
+        if self.HH > self.HH_max:
+            self.HH = self.HH_max
+        if self.HH < -self.HH_max:
+            self.HH = -self.HH_max
 
         # кинетический момент после поворота
         self.H = self.H + self.HH
 
         # насыщение
-        if self.H > k_saturation * Hp:
-            self.H = k_saturation * Hp
-        if self.H < k_saturation * Hm:
-            self.H = k_saturation * Hm
+        if self.H > self.k_saturation * self.Hp:
+            self.H = self.k_saturation * self.Hp
+        if self.H < self.k_saturation * self.Hm:
+            self.H = self.k_saturation * self.Hm
 
         # динамический момент
-        self.Md = Mem - Mc*np.sign(self.H)
+        self.Md = Mem - self.Mc*np.sign(self.H)
 
 
 """
@@ -158,4 +153,3 @@ def get_all(x, w, dm_all):
     HH = from_dm_to_xyz(HH)
 
     return [Md, H, HH]
-
