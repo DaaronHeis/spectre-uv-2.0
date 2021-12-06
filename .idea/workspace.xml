@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="29ed66dd-82a5-4953-8f4c-4f5baad38a6a" name="Default Changelist" comment="Changed w0 to x0">
+    <list default="true" id="29ed66dd-82a5-4953-8f4c-4f5baad38a6a" name="Default Changelist" comment="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Main_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Main_model.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/flywheel_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/flywheel_engine.py" afterDir="false" />
@@ -76,7 +76,14 @@
       <option name="project" value="LOCAL" />
       <updated>1638643520552</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions">
+      <created>1638724595833</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1638724595833</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -94,6 +101,7 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Added project files, changed inertia moment" />
     <MESSAGE value="Changed w0 to x0" />
-    <option name="LAST_COMMIT_MESSAGE" value="Changed w0 to x0" />
+    <MESSAGE value="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions" />
+    <option name="LAST_COMMIT_MESSAGE" value="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions" />
   </component>
 </project>

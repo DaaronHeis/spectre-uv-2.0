@@ -44,7 +44,6 @@ def runge_kutta(t_span, dt, x0, M0, I):
     k = 0
     x = x0
 
-    alpha = 20.0 / 180 * np.pi
     t_curr = t_begin + dt
     h = dt
     t = [t_curr]
@@ -97,14 +96,14 @@ def runge_kutta(t_span, dt, x0, M0, I):
 if __name__ == '__main__':
 
     # время интегрирования
-    t_span = [0, 300]
+    t_span = [0, 120]
 
     # такт вычислений
     dt = 0.25
 
     # внешний возмущающий постоянный момент, угловые скорости и углы (в град/с и град)
     M = [0.0, 0.0, 0.0]
-    x0 = np.array([[0.0], [0.0], [0.0], [-180.0], [0.0], [180.0]])
+    x0 = np.array([[0.0], [0.0], [0.0], [180.0], [180.0], [180.0]])
     x0 = x0 / 180 * np.pi
 
     # тензор инерции (данные из документации, не менять)
@@ -127,7 +126,7 @@ if __name__ == '__main__':
         x[4, i] = x[4, i] / np.pi * 180
         x[5, i] = x[5, i] / np.pi * 180
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4,1)
+    fig, (ax1, ax2) = plt.subplots(2,1)
 
     ax1.plot(t, x[3, :], label="gamma, град")
     ax1.plot(t, x[4, :], label="theta, град")
@@ -143,19 +142,19 @@ if __name__ == '__main__':
     ax2.legend()
     ax2.grid(True)
 
-    ax3.plot(t, H_out[0, :], label="Hx")
-    ax3.plot(t, H_out[1, :], label="Hy")
-    ax3.plot(t, H_out[2, :], label="Hz")
-    ax3.set_title("Изменение кинетического момента ДМ")
-    ax3.legend()
-    ax3.grid(True)
-
-    ax4.plot(t, H_out[3, :], label="HHx")
-    ax4.plot(t, H_out[4, :], label="HHy")
-    ax4.plot(t, H_out[5, :], label="HHz")
-    ax4.set_title("Изменение производной кинетического момента ДМ")
-    ax4.legend()
-    ax4.grid(True)
+    # ax1.plot(t, H_out[0, :], label="Hx")
+    # ax1.plot(t, H_out[1, :], label="Hy")
+    # ax1.plot(t, H_out[2, :], label="Hz")
+    # ax1.set_title("Изменение кинетического момента ДМ")
+    # ax1.legend()
+    # ax1.grid(True)
+    #
+    # ax2.plot(t, H_out[3, :], label="HHx")
+    # ax2.plot(t, H_out[4, :], label="HHy")
+    # ax2.plot(t, H_out[5, :], label="HHz")
+    # ax2.set_title("Изменение производной кинетического момента ДМ")
+    # ax2.legend()
+    # ax2.grid(True)
 
     fig.tight_layout()
     plt.show()

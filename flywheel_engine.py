@@ -25,6 +25,8 @@ Mem_max = 0.20
 k_angle = 0.02
 k_velocity = 1
 
+k_angle_alt = 0.1
+k_velocity_alt = 10
 
 """
     Класс, отражающий один ДМ
@@ -116,10 +118,12 @@ def from_dm_to_xyz(par_in):
 def get_Mem(x, w):
 
     Mem = [0.0, 0.0, 0.0]
-    Mem[0] = -float(k_angle*x[0] + k_velocity*w[0])
-    Mem[1] = -float(k_angle*x[1] + k_velocity*w[1])
-    Mem[2] = -float(k_angle*x[2] + k_velocity*w[2])
     for i in range(3):
+        if x[i] <= 0:
+            Mem[i] = -float(k_angle_alt * x[i] + k_velocity_alt * w[i])
+        else:
+            Mem[i] = -float(k_angle * x[i] + k_velocity * w[i])
+
         if Mem[i] > Mem_max:
             Mem[i] = Mem_max
         if Mem[i] < Mem_min:
