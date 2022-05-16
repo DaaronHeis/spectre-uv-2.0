@@ -14,14 +14,14 @@ import control_unit as ctrl
 # Решение дифференциальных уравнений в конкретный момент времени
 # На вход получает моменты, кинетические моменты ДМ и проекции
 # угловой скорости на ССК
-def f(t, w, M, H, HH, I):
+def f(w, M, H, HH, I):
     """
         Диффуры динамики КА
         Представляют из себя следующую систему:
             w' = A * [a] @ [sigma]
             phi' = w
             [a] и [sigma] - матрица 3х3 и 3х1 соответственно
-            [a] - матрица моменттов инерции
+            [a] - матрица моментов инерции
             [sigma] - вектор-столбец действующих моментов
     """
     ww = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
@@ -56,6 +56,13 @@ def f(t, w, M, H, HH, I):
 # методом Рунге-Кутты
 def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
 
+    # инициализация времени
+    t_begin = t_span[0]
+    t_end = t_span[1]
+    h = dt
+    t = [t_begin]
+    t_curr = t_begin + h
+
     # инициализация моделей ДМ
     dm_all = []
     # TODO: учесть ограничения на скорость из-за астродатчика (не более 0.2 град/с и 0.1 град/с^2 отн. ЭСК)
@@ -69,6 +76,7 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     angles = angles_0
     omega_pr = vel_end
     gamma_pr = angles_end
+
     # TODO: разобраться с начальными параметрами и их корректным представлением
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
     print('l_0 = ', l_0)
@@ -85,23 +93,19 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     l_cur_out = np.array([qt.as_float_array(l_cur)])
     angles = np.array([2*l_delta.w*l_delta.x, 2*l_delta.w*l_delta.y, 2*l_delta.w*l_delta.z])
 
-    ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr, I, w_bw, sigma_max, dt)
+    ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr, I, w_bw, sigma_max, t_begin, dt)
 
     # начальные условия
-    t_begin = t_span[0]
-    t_end = t_span[1]
     k = 0
     x = np.array([[vel[0]], [vel[1]], [vel[2]],
                   [angles[0]], [angles[1]], [angles[2]]])
-
-    h = dt
-    t = [t_begin]
-    t_curr = t_begin + h
 
     H_out = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
     sigma_out = np.array([[0.0], [0.0], [0.0]])
 
     # интегрирование
+    # TODO: переписать модульно, с учетом добавления новых модулей в будущем
+    # TODO: сделать форматный вывод, т.е. формировать выходную структуру с ключами
     while t_curr <= t_end:
 
         t.append(t_curr)
@@ -110,10 +114,15 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         right_column = x[:, k:]
         angles = right_column[3:,0]
         vel = right_column[0:3,0]
-        # right_column = right_column.T
+        """
+            ---------------------------------
+            Шум по скорости учитывается здесь
+            ---------------------------------
+        """
+        # vel = ctrl.add_angular_velocity_noise(vel, t_curr, dt)
 
         # расчет управляющего момента
-        sigma = ctrl_unit.update(vel, t_curr)
+        sigma = ctrl_unit.update(vel)
         sigma = [sigma[0], sigma[1], sigma[2]]
         npsigma = np.array([[sigma[0]], [sigma[1]], [sigma[2]]])
         sigma_out = np.append(sigma_out, npsigma, axis=1)
@@ -149,12 +158,12 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
 
         # коэффициенты для Рунге-Кутты
         # right_column[3:, 0] = angles
-        k1 = f(t_curr, right_column, M, H, HH, I)
-        k2 = f(t_curr, right_column + h * k1 / 2, M, H, HH, I)
-        k3 = f(t_curr, right_column + h * k2 / 2, M, H, HH, I)
-        k4 = f(t_curr, right_column + h * k3, M, H, HH, I)
+        k1 = f(right_column, M, H, HH, I)
+        k2 = f(right_column + h * k1 / 2, M, H, HH, I)
+        k3 = f(right_column + h * k2 / 2, M, H, HH, I)
+        k4 = f(right_column + h * k3, M, H, HH, I)
 
-        # TODO: написать отдельную функцию по формированию выходных массивов
+        # формирование выходных массивов
         H_out_curr = np.array([[H[0]], [H[1]], [H[2]], [HH_dm[0]], [HH_dm[1]], [HH_dm[2]], [HH_dm[3]]])
         right_column = right_column + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
         right_column[3:, 0] = angles
@@ -162,11 +171,7 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         H_out = np.append(H_out, H_out_curr, axis=1)
         k += 1
         t_curr += h
-        """for i in range(3, 6):
-            if x[i, k] >= 2*np.pi:
-                x[i, k] -= 2*np.pi
-            if x[i, k] <= -2*np.pi:
-                x[i, k] += 2*np.pi"""
+        # вывод текущего времени каждые 1000 секунд, чтобы знать, что цикл не завис
         if t_curr % 1000 == 0:
             print('t_curr = ', t_curr)
 
@@ -177,7 +182,20 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
 if __name__ == '__main__':
 
     # время интегрирования
-    t_span = [0, 1820]
+    # TODO: написать нормальный интерфейс вместо постоянной правки кода
+
+    t_span_variant = 1
+
+    if t_span_variant == 0:
+        t_span = [0, 300]
+    elif t_span_variant == 1:
+        t_span = [0, 900]
+    elif t_span_variant == 2:
+        t_span = [0, 1800]
+    elif t_span_variant == 3:
+        t_span = [0, 6000]
+    else:
+        t_span = [0, 600]
 
     # такт вычислений
     dt = 0.25
@@ -196,9 +214,11 @@ if __name__ == '__main__':
         поворот по тангажу (ось Y), затем по рысканью (вокруг оси Z'), и затем по крену (вокруг оси X'')  
     
         Значения внутри векторов - в град/с и град, но сразу же после этого они
-        пересчитываются в радианы    
+        пересчитываются в радианы  
+        
+        "Красивые" начальные углы: [35.0, 40.0, 10.0]   
     """
-    angles_0 = np.array([30.0, 30.0, 30.0]) * k
+    angles_0 = np.array([35.0, 40.0, 10.0]) * k
     angles_end = np.array([0.0, 0.0, 0.0]) * k
     vel_0 = np.array([0.0, 0.0, 0.0]) * k
     vel_end = np.array([0.0, 0.0, 0.0]) * k
@@ -214,7 +234,7 @@ if __name__ == '__main__':
     """
             !!!ВАЖНО!!!
         Выходные углы - это углы, которые получаются из текущего кватерниона ориентации
-        Они (по идее) отображают углы, на которые нужно повернутся, чтобы прийти к итоговой ориентации
+        Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
     [t, x, H_out, l_cur, l_delta, sigma_out] = runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I)
 

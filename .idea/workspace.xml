@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="29ed66dd-82a5-4953-8f4c-4f5baad38a6a" name="Default Changelist" comment="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions">
-      <change afterPath="$PROJECT_DIR$/control_unit.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/spectre-uv.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/spectre-uv.iml" afterDir="false" />
+    <list default="true" id="29ed66dd-82a5-4953-8f4c-4f5baad38a6a" name="Default Changelist" comment="Basic control unit done (without astrocorrection and static error compensation)&#10;Flywheel class rewritten to better account for saturation dynamics&#10;Equations and Runge-Kutta slightly rewritten&#10;Added quaternion dependence">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Main_model.py" beforeDir="false" afterPath="$PROJECT_DIR$/Main_model.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/control_unit.py" beforeDir="false" afterPath="$PROJECT_DIR$/control_unit.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/flywheel_engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/flywheel_engine.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -101,7 +100,14 @@
       <option name="project" value="LOCAL" />
       <updated>1638724595833</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Basic control unit done (without astrocorrection and static error compensation)&#10;Flywheel class rewritten to better account for saturation dynamics&#10;Equations and Runge-Kutta slightly rewritten&#10;Added quaternion dependence">
+      <created>1652687187430</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1652687187430</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.History.Properties">
@@ -142,6 +148,7 @@
     <MESSAGE value="Added project files, changed inertia moment" />
     <MESSAGE value="Changed w0 to x0" />
     <MESSAGE value="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions" />
-    <option name="LAST_COMMIT_MESSAGE" value="Transferred all static parameters belonging to flywheel into flywheel class: changed initial conditions" />
+    <MESSAGE value="Basic control unit done (without astrocorrection and static error compensation)&#10;Flywheel class rewritten to better account for saturation dynamics&#10;Equations and Runge-Kutta slightly rewritten&#10;Added quaternion dependence" />
+    <option name="LAST_COMMIT_MESSAGE" value="Basic control unit done (without astrocorrection and static error compensation)&#10;Flywheel class rewritten to better account for saturation dynamics&#10;Equations and Runge-Kutta slightly rewritten&#10;Added quaternion dependence" />
   </component>
 </project>

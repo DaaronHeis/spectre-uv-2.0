@@ -182,6 +182,35 @@ def integrate_angular_velocity(L: qt.quaternion, w, w_prev, dt):
     return L_rotated
 
 
+def add_angular_velocity_noise(w, t, dt):
+    """
+        Внесение шума в измерение угловой скорости от ГИВУСов по двум параметрам:
+            случайный дрейф
+            нестабильность масштабного коэффициента
+
+        Параметры
+        ----------
+            w: "чистая" текущая угловая скорость - массив np.float 3x1
+            t: текущее время моделирования
+            dt: шаг интегрирования
+        Возвращает
+        ----------
+            w_noise: "грязная" угловая скорость - массив np.float 3x1
+    """
+    w_noise = w
+
+    # добавление случайного дрейфа
+    step_size = 5*1e-4 / 3600
+    sigma = (step_size**2) * t/dt
+    w_noise += np.sqrt(sigma)
+
+    # добавление нестабильности масштабного коэффициента
+    eps = 0.02 / 100
+    dw = eps * w
+    w_noise += dw
+
+    return w_noise
+
 
 class AstroSensor:
     """
@@ -210,7 +239,7 @@ class ControlUnit:
     def __init__(self, l_pr: qt.quaternion,
                        l_cur: qt.quaternion,
                        l_delta: qt.quaternion,
-                        omega, gamma, omega_pr, I, w_bw, sigma_max, dt):
+                        omega, gamma, omega_pr, I, w_bw, sigma_max, t, dt):
         """
             Кватернионы ориентации отсчитываются от ЭСК-2. То есть, высчитывается положение
             начальной точки поворота, конечной точки в ЭСК-2, и затем рассчитывается по этим известным
@@ -224,9 +253,11 @@ class ControlUnit:
             Диагональные матрицы для расчёта управляющего момента
             Являются управляющими коэффициентами, подбираются вручную
             
-            Для варианта c начальными углами 30 градусов и временем 1820 работает управление
+            --------------------------------------------------------
+                            Основной вариант
                 self.K1 = np.diag([0.0475, 0.0875, 0.1075]) * 2
                 self.K2 = np.diag([4.85, 4.85, 4.85]) * 3
+            --------------------------------------------------------
             
             self.K1 = np.diag([0.0475, 0.0875, 0.1075]) * 3
             self.K2 = np.diag([4.85, 4.85, 4.85]) * 4
@@ -236,8 +267,8 @@ class ControlUnit:
             self.K2 = np.diag([4.25, 2.15, 3.85]) * 4
         """
 
-        self.K1 = np.diag([0.0475, 0.0875, 0.1075]) * 2
-        self.K2 = np.diag([4.85, 4.85, 4.85]) * 3
+        self.K1 = np.diag([0.0675, 0.0875, 0.1075]) * 3
+        self.K2 = np.diag([4.85, 4.85, 4.85]) * 3.5
 
         self.omega = omega                                      # текущий вектор угловой скорости
         self.gamma = gamma                                      # текущие вычисляемые углы поворота КА
@@ -250,6 +281,7 @@ class ControlUnit:
 
         self.sigma_max = sigma_max
         self.dt = dt
+        self.t = t
 
     def set_gamma(self):
         """ Определение вектора углового положения КА """
@@ -296,7 +328,7 @@ class ControlUnit:
         self.omega_prev = self.omega
         self.omega = omega
 
-    def update(self, vel, t):
+    def update(self, vel):
         """
          Один шаг интегрирования для управляющего модуля
          Расчитывает управляющий момент и обновляет свое состояние
@@ -305,9 +337,6 @@ class ControlUnit:
          ----------
          vel: np.array[1, 3]
                 Текущая угловая скорость
-         t0, t1: float
-                Начальный и конечный моменты интегрирования
-                Обычно это время на предыдущем шаге и текущий моментб т.е t-dt и t
 
          Возвращает
          ----------
@@ -315,8 +344,9 @@ class ControlUnit:
                 Требуемые управляющие моменты по каждой оси
         """
 
+        self.t += self.dt
         self.set_velocity(vel)
-        self.set_current_orientation(t-self.dt, t)
+        self.set_current_orientation(self.t-self.dt, self.t)
         self.set_delta()
         self.set_gamma()
         sigma = self.get_control_moment()
