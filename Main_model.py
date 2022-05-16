@@ -82,10 +82,16 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     print('l_0 = ', l_0)
     l_k = ctrl.from_euler_to_quat(gamma_pr, 'YZXr')
 
-    # пока итоговая ориентация задается здесь
+    """
+        ---------------------------------------
+        Итоговая ориентация пока задается здесь
+        ---------------------------------------
+    """
     # l_pr = l_k.inverse() * l_0
     l_pr = qt.quaternion(1, 0, 0, 0)
     print('l_pr = ', l_pr)
+
+    # расчёт параметров начальной ориентации
     l_cur = l_0
     l_delta = l_pr.inverse() * l_cur
     print('l_delta = ', l_delta)
@@ -93,7 +99,16 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     l_cur_out = np.array([qt.as_float_array(l_cur)])
     angles = np.array([2*l_delta.w*l_delta.x, 2*l_delta.w*l_delta.y, 2*l_delta.w*l_delta.z])
 
-    ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr, I, w_bw, sigma_max, t_begin, dt)
+    """
+        -------------------------------------
+        Инициализация модуля управления здесь
+        -------------------------------------
+    """
+    ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
+                                 I, w_bw, sigma_max, t_begin, dt, corr_key=True)
+
+    # инициализация астродатчика
+    astrosensor = ctrl.AstroSensor(vel)
 
     # начальные условия
     k = 0
@@ -106,6 +121,8 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     # интегрирование
     # TODO: переписать модульно, с учетом добавления новых модулей в будущем
     # TODO: сделать форматный вывод, т.е. формировать выходную структуру с ключами
+
+
     while t_curr <= t_end:
 
         t.append(t_curr)
@@ -119,10 +136,11 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
             Шум по скорости учитывается здесь
             ---------------------------------
         """
-        # vel = ctrl.add_angular_velocity_noise(vel, t_curr, dt)
+        vel_noise = ctrl.add_angular_velocity_noise(vel, t_curr, dt)
 
         # расчет управляющего момента
-        sigma = ctrl_unit.update(vel)
+        astrosensor.set_correction(vel, vel_noise)
+        sigma = ctrl_unit.update(vel_noise, astrosensor)
         sigma = [sigma[0], sigma[1], sigma[2]]
         npsigma = np.array([[sigma[0]], [sigma[1]], [sigma[2]]])
         sigma_out = np.append(sigma_out, npsigma, axis=1)
