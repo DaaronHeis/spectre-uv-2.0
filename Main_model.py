@@ -24,113 +24,155 @@ def f(w, M, H, HH, I):
             [a] - матрица моментов инерции
             [sigma] - вектор-столбец действующих моментов
     """
-    ww = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
+    # ww = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
     A = 1/(I[0,0]*I[1,1]*I[2,2] - I[0,0]*I[1,2]**2 - I[1,1]*I[0,2]**2 - I[2,2]*I[0,1]**2 - 2*I[0,1]*I[0,2]*I[1,2])
-    sigma = np.array([[0.], [0.], [0.]])
-    sigma[0,0] = M[0] - (HH[0] + H[2]*w[1] - H[1]*w[2])
-    sigma[1,0] = M[1] - (HH[1] + H[0]*w[2] - H[2]*w[0])
-    sigma[2,0] = M[2] - (HH[2] + H[1]*w[0] - H[0]*w[1])
-    a = np.array([[I[1,1]*I[2,2]-I[1,2]**2, I[2,2]*I[0,1]+I[0,2]*I[1,2], I[1,1]*I[0,2]+I[0,1]*I[1,2]],
-                  [I[2,2]*I[0,1]+I[0,2]*I[1,2], I[0,0]*I[2,2]-I[0,2]**2, I[0,0]*I[1,2]+I[0,1]*I[0,2]],
-                  [I[1,1]*I[0,2]+I[0,1]*I[1,2], I[0,0]*I[1,2]+I[0,1]*I[0,2], I[0,0]*I[1,1]-I[0,1]**2]])
-    ww[0:3, :] = A * (a @ sigma)
-    """
-    sigma = [0, 0, 0]
+    sigma = np.array([0.0, 0.0, 0.0])
     sigma[0] = M[0] - (HH[0] + H[2]*w[1] - H[1]*w[2])
     sigma[1] = M[1] - (HH[1] + H[0]*w[2] - H[2]*w[0])
     sigma[2] = M[2] - (HH[2] + H[1]*w[0] - H[0]*w[1])
-    ww[0,0] = a*((I[1,1]*I[2,2]-I[1,2]**2)*sigma[0] + (I[2,2]*I[0,1]+I[0,2]*I[1,2])*sigma[1] +
-               + (I[1,1]*I[0,2]+I[0,1]*I[1,2])*sigma[2])
-    ww[1,0] = a*((I[2,2]*I[0,1]+I[0,2]*I[1,2])*sigma[0] + (I[0,0]*I[2,2]-I[0,2]**2)*sigma[1] +
-               + (I[0,0]*I[1,2]+I[0,1]*I[0,2])*sigma[2])
-    ww[2,0] = a*((I[1,1]*I[0,2]+I[0,1]*I[1,2])*sigma[0] + (I[0,0]*I[1,2]+I[0,1]*I[0,2])*sigma[1] +
-               + (I[0,0]*I[1,1]-I[0,1]**2)*sigma[2])
-    """
-    ww[3,0] = w[0]
-    ww[4,0] = w[1]
-    ww[5,0] = w[2]
+    a = np.array([[I[1,1]*I[2,2]-I[1,2]**2, I[2,2]*I[0,1]+I[0,2]*I[1,2], I[1,1]*I[0,2]+I[0,1]*I[1,2]],
+                  [I[2,2]*I[0,1]+I[0,2]*I[1,2], I[0,0]*I[2,2]-I[0,2]**2, I[0,0]*I[1,2]+I[0,1]*I[0,2]],
+                  [I[1,1]*I[0,2]+I[0,1]*I[1,2], I[0,0]*I[1,2]+I[0,1]*I[0,2], I[0,0]*I[1,1]-I[0,1]**2]])
+    ww = A * (a @ sigma.T)
     return ww
 
 
-# Решение системы диффуров на определенном промежутке времени
-# методом Рунге-Кутты
-def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
-
-    # инициализация времени
+def init_time(t_span, dt):
     t_begin = t_span[0]
     t_end = t_span[1]
     h = dt
     t = [t_begin]
     t_curr = t_begin + h
+    return t, t_curr, h, t_end
 
-    # инициализация моделей ДМ
+
+def init_flywheels(n, w_bw, sigma_max):
     dm_all = []
-    # TODO: учесть ограничения на скорость из-за астродатчика (не более 0.2 град/с и 0.1 град/с^2 отн. ЭСК)
-    sigma_max = 0.2
-    w_bw = 5
-    for j in range(4):
+    for j in range(n):
         dm_all.append(dm.Flywheel(0,0,0,0,w_bw))
+    return dm_all
 
-    # инициализация модуля управления
-    vel = vel_0
-    angles = angles_0
-    omega_pr = vel_end
-    gamma_pr = angles_end
 
-    # TODO: разобраться с начальными параметрами и их корректным представлением
-    l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
-    print('l_0 = ', l_0)
+def init_target_orientation(angles_end, vel_end):
+    omega_pr = vel_end.copy()
+    gamma_pr = angles_end.copy()
     l_k = ctrl.from_euler_to_quat(gamma_pr, 'YZXr')
-
-    """
-        ---------------------------------------
-        Итоговая ориентация пока задается здесь
-        ---------------------------------------
-    """
     # l_pr = l_k.inverse() * l_0
     l_pr = qt.quaternion(1, 0, 0, 0)
     print('l_pr = ', l_pr)
+    return l_pr, omega_pr
 
-    # расчёт параметров начальной ориентации
-    l_cur = l_0
+
+def init_start_orientation(angles_0):
+    angles = angles_0
+    l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
+    print('l_0 = ', l_0)
+    return l_0
+
+
+def init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_begin, dt):
+    vel = vel_0.copy()
+    l_cur = l_0.copy()
     l_delta = l_pr.inverse() * l_cur
     print('l_delta = ', l_delta)
-    l_delta_out = np.array([qt.as_float_array(l_delta)])
-    l_cur_out = np.array([qt.as_float_array(l_cur)])
-    angles = np.array([2*l_delta.w*l_delta.x, 2*l_delta.w*l_delta.y, 2*l_delta.w*l_delta.z])
+    angles = np.array([2 * l_delta.w * l_delta.x, 2 * l_delta.w * l_delta.y, 2 * l_delta.w * l_delta.z])
+    ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
+                                 I, w_bw, sigma_max, t_begin, dt, corr_key=True)
+    return angles, vel, ctrl_unit
+
+
+def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
+    """
+        t_span: float[1x2] - начальный и конечный моменты времени
+        dt: float
+        angles_0: np.array(float[1x3]) - начальные углы в радианах
+        angles_end: np.array(float[1x3]) - конечные углы в радианах (пока не используются)
+        vel_0: np.array(float[1x3]) - начальные угловые скорости
+        vel_end: np.array(float[1x3]) - конечные угловые скорости
+        M0: float[1x3] - внешние возмущающие моменты
+        I: np.array(float[3x3]) - тензор инерции
+    """
+
+    # инициализация времени
+    [t, t_curr, h, t_end] = init_time(t_span, dt)
+
+    # инициализация моделей ДМ
+    # TODO: учесть ограничения на скорость из-за астродатчика (не более 0.2 град/с и 0.1 град/с^2 отн. ЭСК)
+    sigma_max = 0.2
+    w_bw = 5
+    n = 4
+    dm_all = init_flywheels(n, w_bw, sigma_max)
+
+    # инициалиация ориентации
+    [l_pr, omega_pr] = init_target_orientation(angles_end, vel_end)
+    l_0 = init_start_orientation(angles_0)
 
     """
         -------------------------------------
         Инициализация модуля управления здесь
         -------------------------------------
     """
-    ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
-                                 I, w_bw, sigma_max, t_begin, dt, corr_key=True)
+    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_curr-dt, dt)
 
     # инициализация астродатчика
     astrosensor = ctrl.AstroSensor(vel)
 
     # начальные условия
     k = 0
-    x = np.array([[vel[0]], [vel[1]], [vel[2]],
-                  [angles[0]], [angles[1]], [angles[2]]])
 
-    H_out = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
-    sigma_out = np.array([[0.0], [0.0], [0.0]])
+    """
+        ---------------------------------------------
+        Инициализирование словаря с выходными данными
+        ---------------------------------------------
+    """
+
+    H_dm_out = np.array([0.0, 0.0, 0.0, 0.0])
+    H_xyz_out = np.array([0.0, 0.0, 0.0])
+    HH_dm_out = np.array([0.0, 0.0, 0.0, 0.0])
+    HH_xyz_out = np.array([0.0, 0.0, 0.0])
+    sigma_out = np.array([0.0, 0.0, 0.0])
+
+    [a, b, c, d] = ctrl_unit.get_parameters()
+    a = qt.as_float_array(a)
+    l_cur_out = np.array([a[0], a[1], a[2], a[3]])
+    b = qt.as_float_array(b)
+    l_delta_out = np.array([b[0], b[1], b[2], b[3]])
+
+    vel_noise_out = np.array(vel)
+    angles_out = np.array(angles)
+    vel_out = np.array(vel)
+
+    results = {}
+    results["Углы отклонения от заданной ориентации"] = [angles_out]
+    results["Угловые скорости"] = [vel_out]
+    results["Угловые скорости с учётом шума"] = [vel_noise_out]
+    results["Кинетические моменты каждого ДМ"] = [H_dm_out]
+    results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
+    #results["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
+    #results["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    results["Значения вектора управления по каждой оси"] = [sigma_out]
+    results["Кватернион рассогласования"] = [l_delta_out]
+    results["Кватернион текущей ориентации"] = [l_cur_out]
+
+    handles = {}
+    handles["Углы отклонения от заданной ориентации"] = ["gamma", "theta", "psi"]
+    handles["Угловые скорости"] = ["w_x", "w,y", "w_z"]
+    handles["Угловые скорости с учётом шума"] = ["w_x", "w,y", "w_z"]
+    handles["Кинетические моменты каждого ДМ"] = ["H_1", "H_2", "H_3", "H_4"]
+    handles["Кинетические моменты в проекциях на оси ССК"] = ["H_x", "H_y", "H_z"]
+    # handles["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
+    # handles["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    handles["Значения вектора управления по каждой оси"] = ["sigma_x", "sigma_y", "sigma_z"]
+    handles["Кватернион рассогласования"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
+    handles["Кватернион текущей ориентации"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
 
     # интегрирование
     # TODO: переписать модульно, с учетом добавления новых модулей в будущем
-    # TODO: сделать форматный вывод, т.е. формировать выходную структуру с ключами
-
 
     while t_curr <= t_end:
 
         t.append(t_curr)
 
-        # текущие значения скоростей и углов
-        right_column = x[:, k:]
-        angles = right_column[3:,0]
-        vel = right_column[0:3,0]
         """
             ---------------------------------
             Шум по скорости учитывается здесь
@@ -142,18 +184,14 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         astrosensor.set_correction(vel, vel_noise)
         sigma = ctrl_unit.update(vel_noise, astrosensor)
         sigma = [sigma[0], sigma[1], sigma[2]]
-        npsigma = np.array([[sigma[0]], [sigma[1]], [sigma[2]]])
-        sigma_out = np.append(sigma_out, npsigma, axis=1)
 
         # получение текущих параметров модуля управления
         [a, b, c, d] = ctrl_unit.get_parameters()
         a = qt.as_float_array(a)
-        l_cur = np.array([[a[0], a[1], a[2], a[3]]])
+        l_cur = np.array([a[0], a[1], a[2], a[3]])
         b = qt.as_float_array(b)
-        l_delta = np.array([[b[0], b[1], b[2], b[3]]])
-        l_cur_out = np.append(l_cur_out, l_cur, axis=0)
-        l_delta_out = np.append(l_delta_out, l_delta, axis=0)
-        angles = c #np.array([c[0], c[2], c[1]])
+        l_delta = np.array([b[0], b[1], b[2], b[3]])
+        angles = c
 
         # расчет динамического момента комплекса двигателей-маховиков
         Md = dm.update_block(sigma, dm_all)
@@ -167,34 +205,38 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
             H_dm.append(param[1])
             HH_dm.append(param[2])
             w_self_dm.append(param[3])
-        H = dm.from_dm_to_xyz(H_dm)
-        HH = dm.from_dm_to_xyz(HH_dm)
+        H_xyz = dm.from_dm_to_xyz(H_dm)
+        HH_xyz = dm.from_dm_to_xyz(HH_dm)
+        H = H_xyz.copy()
+        HH = HH_xyz.copy()
 
         # расчет действующего момента
         for j in range(3):
             M[j] = M0[j] + Md[j]
 
-        # коэффициенты для Рунге-Кутты
-        # right_column[3:, 0] = angles
-        k1 = f(right_column, M, H, HH, I)
-        k2 = f(right_column + h * k1 / 2, M, H, HH, I)
-        k3 = f(right_column + h * k2 / 2, M, H, HH, I)
-        k4 = f(right_column + h * k3, M, H, HH, I)
+        k1 = f(vel, M, H, HH, I)
+        k2 = f(vel + h*k1/2, M, H, HH, I)
+        k3 = f(vel + h*k2/2, M, H, HH, I)
+        k4 = f(vel + h*k3, M, H, HH, I)
 
         # формирование выходных массивов
-        H_out_curr = np.array([[H[0]], [H[1]], [H[2]], [HH_dm[0]], [HH_dm[1]], [HH_dm[2]], [HH_dm[3]]])
-        right_column = right_column + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
-        right_column[3:, 0] = angles
-        x = np.append(x, right_column, axis=1)
-        H_out = np.append(H_out, H_out_curr, axis=1)
+        vel = vel + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+        results["Углы отклонения от заданной ориентации"].append(angles)
+        results["Угловые скорости"].append(vel)
+        results["Угловые скорости с учётом шума"].append(vel_noise)
+        results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
+        results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz)
+        results["Значения вектора управления по каждой оси"].append(np.array(sigma))
+        results["Кватернион рассогласования"].append(l_delta)
+        results["Кватернион текущей ориентации"].append(l_cur)
+
         k += 1
         t_curr += h
         # вывод текущего времени каждые 1000 секунд, чтобы знать, что цикл не завис
         if t_curr % 1000 == 0:
             print('t_curr = ', t_curr)
 
-    # final_param = [t, x, H_out, l_cur_out, l_delta_out, sigma_out]
-    return [t, x, H_out, l_cur_out, l_delta_out, sigma_out]
+    return t, results, handles
 
 
 if __name__ == '__main__':
@@ -254,81 +296,35 @@ if __name__ == '__main__':
         Выходные углы - это углы, которые получаются из текущего кватерниона ориентации
         Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
-    [t, x, H_out, l_cur, l_delta, sigma_out] = runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I)
+    [t, results, handles] = runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I)
 
     # отображение графиков
     n = len(t)
-    x[:, :] = x[:, :] / k
-
-    angles = x[3:6, :]
-    vel = x[0:3, :]
+    # tmp = [vector/k for vector in results["angles"]]
+    results["Углы отклонения от заданной ориентации"] = \
+        [vector/k for vector in results["Углы отклонения от заданной ориентации"]]
+    results["Угловые скорости"] = \
+        [vector/k for vector in results["Угловые скорости"]]
+    results["Угловые скорости с учётом шума"] = \
+        [vector/k for vector in results["Угловые скорости с учётом шума"]]
 
     # с этого момента все углы в градусах
 
-    fig1, (ax1, ax2) = plt.subplots(2,1)
+    # включение LaTeX
+    # plt.rcParams.update({"text.usetex":True})
 
-    ax1.plot(t, angles[0, :], label="gamma, град")
-    ax1.plot(t, angles[1, :], label="theta, град")
-    ax1.plot(t, angles[2, :], label="psi, град")
-    ax1.set_title("Изменение углов")
-    ax1.legend()
-    ax1.grid(True)
-
-    ax2.plot(t, vel[0,:], label="wx, град/с")
-    ax2.plot(t, vel[1,:], label="wy, град/с")
-    ax2.plot(t, vel[2,:], label="wz, град/с")
-    ax2.set_title("Изменение угловых скоростей")
-    ax2.legend()
-    ax2.grid(True)
-
-    fig2, (ax1, ax2) = plt.subplots(2,1)
-
-    ax1.plot(t, H_out[0, :], label="Hx")
-    ax1.plot(t, H_out[1, :], label="Hy")
-    ax1.plot(t, H_out[2, :], label="Hz")
-    ax1.set_title("Изменение кинетического момента в проекциях")
-    ax1.legend()
-    ax1.grid(True)
-
-    ax2.plot(t, H_out[3, :], label="H1")
-    ax2.plot(t, H_out[4, :], label="H2")
-    ax2.plot(t, H_out[5, :], label="H3")
-    ax2.plot(t, H_out[6, :], label="H4")
-    ax2.set_title("Изменение кинетического момента каждого ДМ")
-    ax2.legend()
-    ax2.grid(True)
-
-    fig3, (ax1, ax2) = plt.subplots(2,1)
-
-    ax1.plot(t, sigma_out[0, :], label="sigma_x")
-    ax1.plot(t, sigma_out[1, :], label="sigma_y")
-    ax1.plot(t, sigma_out[2, :], label="sigma_z")
-    ax1.set_title("Изменение управляющего момента")
-    ax1.legend()
-    ax1.grid(True)
-
-    ax2.plot(t, l_delta[:, 0], label="L[0]")
-    ax2.plot(t, l_delta[:, 1], label="L[1]")
-    ax2.plot(t, l_delta[:, 2], label="L[2]")
-    ax2.plot(t, l_delta[:, 3], label="L[3]")
-    ax2.set_title("Изменение кватерниона рассогласования")
-    ax2.legend()
-    ax2.grid(True)
-
-    """
-    ax1.plot(t, l_cur[:, 0], label="L[0]")
-    ax1.plot(t, l_cur[:, 1], label="L[1]")
-    ax1.plot(t, l_cur[:, 2], label="L[2]")
-    ax1.plot(t, l_cur[:, 3], label="L[3]")
-    ax1.set_title("Изменение кватерниона текущей ориентации")
-    ax1.legend()
-    ax1.grid(True)
-    fig4, (ax1, ax2) = plt.subplots(2,1)
-    
-    """
-
-    fig1.tight_layout()
-    fig2.tight_layout()
-    fig3.tight_layout()
-    # fig4.tight_layout()
+    i = 1
+    for u in results.keys():
+        fig = plt.figure(i)
+        a = results[u]
+        b = handles[u]
+        n = len(a[0])
+        labels = []
+        for j in range(n):
+            labels.append(b[j])
+        plt.plot(t, a, label=labels)
+        plt.title(u)
+        plt.legend()
+        plt.grid(True)
+        i += 1
     plt.show()

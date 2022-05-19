@@ -201,7 +201,7 @@ def add_angular_velocity_noise(w: np.array, t, dt):
     w_noise = w.copy()
 
     # добавление случайного дрейфа
-    step_size = 0.0005 / 3600 * dt
+    step_size = 0.0005 / 3600 * dt * 50
     sigma = (step_size**2) * t/dt
     w_noise += random.choice([-1, 1]) * np.sqrt(sigma)
 
@@ -256,7 +256,7 @@ class ControlUnit:
         """
         self.l_pr = l_pr                                       # кватернион программной ориентации
         self.l_cur = l_cur                                     # кватернион текущей ориентации
-        self.l_delta: l_delta                                  # кватернион рассогласования
+        self.l_delta = l_delta                                  # кватернион рассогласования
 
         """
             Диагональные матрицы для расчёта управляющего момента

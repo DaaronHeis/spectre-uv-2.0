@@ -139,25 +139,6 @@ def from_dm_to_xyz(par_in):
 
     return par_out
 
-"""
-# генерирование управляющего момента Mem
-# возвращает управляющий момент по каждой оси
-def get_Mem(x, w):
-
-    Mem = [0.0, 0.0, 0.0]
-    for i in range(3):
-        if x[i] <= 0:
-            Mem[i] = -float(k_angle_alt * x[i] + k_velocity_alt * w[i])
-        else:
-            Mem[i] = -float(k_angle * x[i] + k_velocity * w[i])
-
-        if Mem[i] > Mem_max:
-            Mem[i] = Mem_max
-        if Mem[i] < Mem_min:
-            Mem[i] = Mem_min
-    return Mem
-"""
-
 
 # одновременно обновляя каждый ДМ
 # dm_all - список, содержащий все объекты ДМ-ов
@@ -184,7 +165,7 @@ def update_block(sigma, dm_all):
     return Md
 
 
-def get_all(dm_all, **kwargs):
+def get_all(dm_all):
     """
         Возвращает текущие динамические параметры каждого ДМ в блоке
         НЕ ПЕРЕВОДИТ в проекции на оси координат
