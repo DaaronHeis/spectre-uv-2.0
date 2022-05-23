@@ -48,7 +48,7 @@ class Flywheel:
         self.Md = Md                    # получающийся динамический момент ДМ
 
         # статические параметры ДМ
-        self.c = 0.03                   # демпфирующий коэффициент
+        self.c = 0.020                  # демпфирующий коэффициент
         self.J = 1.5                    # момент инерции, кгм^2
         self.k_saturation = 2           # коэффициент ограничения
         self.HH_max = w_bw * self.J     # коэффициент насыщения
@@ -61,7 +61,7 @@ class Flywheel:
     def change(self, Mem):
 
         # скорость изменения кинетического момента
-        self.HH = Mem - self.Mc*np.sign(self.w_self) - self.c*self.w_self
+        self.HH = Mem - self.Mc*np.sign(self.w_self)*abs(self.H/self.Hm) - self.c*self.w_self
 
         # насыщение
         if self.HH > self.HH_max:
@@ -88,7 +88,7 @@ class Flywheel:
             self.H = self.k_saturation * self.Hm
 
         # динамический момент
-        self.Md = Mem - self.Mc*np.sign(self.H) - self.c*self.w_self
+        self.Md = Mem - self.Mc*np.sign(self.H)*abs(self.H/self.Hm) - self.c*self.w_self
 
     def get_param(self):
         """

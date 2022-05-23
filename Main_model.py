@@ -141,30 +141,33 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     vel_noise_out = np.array(vel)
     angles_out = np.array(angles)
     vel_out = np.array(vel)
+    w_dm_out = np.array([0.0, 0.0, 0.0, 0.0])
 
     results = {}
     results["Углы отклонения от заданной ориентации"] = [angles_out]
     results["Угловые скорости"] = [vel_out]
-    results["Угловые скорости с учётом шума"] = [vel_noise_out]
-    results["Кинетические моменты каждого ДМ"] = [H_dm_out]
-    results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
-    #results["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
-    #results["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    # results["Угловые скорости с учётом шума"] = [vel_noise_out]
+    # results["Кинетические моменты каждого ДМ"] = [H_dm_out]
+    # results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
+    # results["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
+    # results["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    # results["Скорости вращения ДМ"] = [w_dm_out]
     results["Значения вектора управления по каждой оси"] = [sigma_out]
     results["Кватернион рассогласования"] = [l_delta_out]
-    results["Кватернион текущей ориентации"] = [l_cur_out]
+    # results["Кватернион текущей ориентации"] = [l_cur_out]
 
     handles = {}
     handles["Углы отклонения от заданной ориентации"] = ["gamma", "theta", "psi"]
-    handles["Угловые скорости"] = ["w_x", "w,y", "w_z"]
-    handles["Угловые скорости с учётом шума"] = ["w_x", "w,y", "w_z"]
-    handles["Кинетические моменты каждого ДМ"] = ["H_1", "H_2", "H_3", "H_4"]
-    handles["Кинетические моменты в проекциях на оси ССК"] = ["H_x", "H_y", "H_z"]
+    handles["Угловые скорости"] = ["w_x", "w_y", "w_z"]
+    # handles["Угловые скорости с учётом шума"] = ["w_x", "w,y", "w_z"]
+    # handles["Кинетические моменты каждого ДМ"] = ["H_1", "H_2", "H_3", "H_4"]
+    # handles["Кинетические моменты в проекциях на оси ССК"] = ["H_x", "H_y", "H_z"]
     # handles["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
     # handles["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    # handles["Скорости вращения ДМ"] = ["w_1", "w_2", "w_3", "w_4"]
     handles["Значения вектора управления по каждой оси"] = ["sigma_x", "sigma_y", "sigma_z"]
     handles["Кватернион рассогласования"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
-    handles["Кватернион текущей ориентации"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
+    # handles["Кватернион текущей ориентации"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
 
     # интегрирование
     # TODO: переписать модульно, с учетом добавления новых модулей в будущем
@@ -214,6 +217,7 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         for j in range(3):
             M[j] = M0[j] + Md[j]
 
+        # коэффициенты для Рунге-Кутты
         k1 = f(vel, M, H, HH, I)
         k2 = f(vel + h*k1/2, M, H, HH, I)
         k3 = f(vel + h*k2/2, M, H, HH, I)
@@ -223,12 +227,13 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         vel = vel + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
         results["Углы отклонения от заданной ориентации"].append(angles)
         results["Угловые скорости"].append(vel)
-        results["Угловые скорости с учётом шума"].append(vel_noise)
-        results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
-        results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz)
+        # results["Угловые скорости с учётом шума"].append(vel_noise)
+        # results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
+        # results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz)
+        # results["Скорости вращения ДМ"].append(np.array(w_self_dm))
         results["Значения вектора управления по каждой оси"].append(np.array(sigma))
         results["Кватернион рассогласования"].append(l_delta)
-        results["Кватернион текущей ориентации"].append(l_cur)
+        # results["Кватернион текущей ориентации"].append(l_cur)
 
         k += 1
         t_curr += h
@@ -244,7 +249,7 @@ if __name__ == '__main__':
     # время интегрирования
     # TODO: написать нормальный интерфейс вместо постоянной правки кода
 
-    t_span_variant = 1
+    t_span_variant = 5
 
     if t_span_variant == 0:
         t_span = [0, 300]
@@ -276,9 +281,9 @@ if __name__ == '__main__':
         Значения внутри векторов - в град/с и град, но сразу же после этого они
         пересчитываются в радианы  
         
-        "Красивые" начальные углы: [35.0, 40.0, 10.0]   
+        "Красивые" начальные углы: [35.0, 40.0, 20.0]   
     """
-    angles_0 = np.array([35.0, 40.0, 10.0]) * k
+    angles_0 = np.array([35.0, 40.0, 20.0]) * k
     angles_end = np.array([0.0, 0.0, 0.0]) * k
     vel_0 = np.array([0.0, 0.0, 0.0]) * k
     vel_end = np.array([0.0, 0.0, 0.0]) * k
@@ -305,13 +310,23 @@ if __name__ == '__main__':
         [vector/k for vector in results["Углы отклонения от заданной ориентации"]]
     results["Угловые скорости"] = \
         [vector/k for vector in results["Угловые скорости"]]
+    """
     results["Угловые скорости с учётом шума"] = \
-        [vector/k for vector in results["Угловые скорости с учётом шума"]]
+        [vector/k for vector in results["Угловые скорости с учётом шума"]]"""
 
     # с этого момента все углы в градусах
 
     # включение LaTeX
     # plt.rcParams.update({"text.usetex":True})
+
+    a = results["Углы отклонения от заданной ориентации"]
+    a = a[len(a)-1]
+    print("------------------------------------------------")
+    print("        Ошибка ориентации по углам              ")
+    print("По углу крена: ", a[0]*60, "угл. мин.")
+    print("По углу тангажа: ", a[1] * 60, "угл. мин.")
+    print("По углу рысканья: ", a[2] * 60, "угл. мин.")
+    print("------------------------------------------------")
 
     i = 1
     for u in results.keys():

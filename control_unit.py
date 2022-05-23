@@ -256,7 +256,7 @@ class ControlUnit:
         """
         self.l_pr = l_pr                                       # кватернион программной ориентации
         self.l_cur = l_cur                                     # кватернион текущей ориентации
-        self.l_delta = l_delta                                  # кватернион рассогласования
+        self.l_delta = l_delta                                 # кватернион рассогласования
 
         """
             Диагональные матрицы для расчёта управляющего момента
@@ -268,16 +268,26 @@ class ControlUnit:
                 self.K2 = np.diag([4.85, 4.85, 4.85]) * 3
             --------------------------------------------------------
             
-            self.K1 = np.diag([0.0475, 0.0875, 0.1075]) * 3
-            self.K2 = np.diag([4.85, 4.85, 4.85]) * 4
-            
-            Для угла в 30 градусов возникают колебания, но потом затухают
-            self.K1 = np.diag([0.0475, 0.0675, 0.0675]) * 3
-            self.K2 = np.diag([4.25, 2.15, 3.85]) * 4
+        self.K1_pt = np.diag([0.1075, 0.0875, 0.1075]) * 0.5
+        self.K2_pt = np.diag([4.85, 3.85, 4.85]) * 1.3
+
+        self.K1_st = np.diag([0.0875, 0.0875, 0.1075]) * 0.5
+        self.K2_st = np.diag([4.85, 3.85, 4.85]) * 1.1
         """
 
-        self.K1 = np.diag([0.0675, 0.0875, 0.1075]) * 2
-        self.K2 = np.diag([4.85, 4.85, 4.85]) * 3
+        # коэффициенты управления для перенацеливания
+        # self.K1_pt = np.diag([0.0675, 0.0675, 0.0775]) * 0.6
+        # self.K2_pt = np.diag([4.85, 6.85, 6.55]) * 0.8
+        self.K1_pt = np.diag([0.1055, 0.1175, 0.1075]) * 0.55
+        self.K2_pt = np.diag([4.75, 4.55, 4.85]) * 1.1
+
+        # коэффициенты управления для стабилизации
+        # self.K1_st = np.diag([0.0675, 0.0875, 0.1075]) * 2.2
+        # self.K2_st = self.K1_st * 6
+        self.K1_st = np.diag([0.1275, 0.0875, 0.1075]) * 0.5
+        self.K2_st = np.diag([4.85, 3.85, 4.85]) * 1.3
+
+        self.threshold = 5 / 180 * np.pi                        # порог переключения
 
         self.omega = omega                                      # текущий вектор угловой скорости
         self.gamma = gamma                                      # текущие вычисляемые углы поворота КА
@@ -287,8 +297,11 @@ class ControlUnit:
         self.omega_delta = np.array([0.0, 0.0, 0.0])            # разница между текущей и программной скоростью
         self.omega_cor = np.array([0.0, 0.0, 0.0])              # угловая скорость коррекции (от астродатчика)
         self.omega_prev = omega
+        self.sigma_prev = np.array([0.0, 0.0, 0.0])
 
         self.sigma_max = sigma_max
+        self.w_bw = w_bw
+        self.flag = False
         self.dt = dt
         self.t = t
         self.corr_key = corr_key                                # ключ, подключающий коррекцию по астродатчику
@@ -304,7 +317,7 @@ class ControlUnit:
     def set_delta(self):
         """ Вычисление кватерниона рассогласования """
         self.l_delta = self.l_pr.inverse() * self.l_cur
-        self.omega_delta = np.array(self.omega) - np.array(self.omega_pr)
+        # self.omega_delta = self.omega - self.omega_pr
 
     def get_correction(self, astrosensor):
         """ Получение угловой скорости коррекции от астродатчика """
@@ -312,13 +325,36 @@ class ControlUnit:
 
     def get_control_moment(self):
         """ Получение управляющего момента """
-        sigma = -(self.K1 @ self.gamma + self.K2 @ self.omega_delta)
+        if (abs(self.gamma[0]) < self.threshold
+            and abs(self.gamma[1]) < self.threshold
+            and abs(self.gamma[2]) < self.threshold):
+            # стабилизация
+            if self.flag == False:
+                self.flag = True
+                print(self.t, self.flag)
+            self.omega_delta = self.omega - self.omega_pr
+            sigma = -(self.K1_st @ self.gamma + self.K2_st @ self.omega_delta)
+            #sigma = sigma + np.sign(sigma)*0.0012
+        else:
+            # перенацеливание
+            if self.flag == True:
+                self.flag = False
+                print(self.t, self.flag)
+            # self.omega_delta = self.omega + self.K1_pt @ self.gamma
+            # sigma = - self.K2_pt @ self.omega_delta
+            sigma = -self.K1_pt @ self.gamma - self.K2_pt @ self.omega
+
         for i in range(len(sigma)):
             if abs(sigma[i]) > self.sigma_max:
                 sigma[i] = self.sigma_max * np.sign(sigma[i])
+        for i in range(len(sigma)):
+            delta_sigma = sigma[i] - self.sigma_prev[i]
+            if abs(delta_sigma) > self.w_bw * 0.2:
+                sigma[i] = self.sigma_prev[i] + np.sign(delta_sigma)*self.w_bw*0.2
+        self.sigma_prev = sigma
         return sigma
 
-    def set_current_orientation(self, t0, t1):
+    def set_current_orientation(self):
         """ Вычисление кватерниона текущей ориентации путем интегрирования уравнений движения """
         omega_prev = [self.omega_prev[0], self.omega_prev[1], self.omega_prev[2]]
         omega = [self.omega[0], self.omega[1], self.omega[2]]
@@ -347,7 +383,7 @@ class ControlUnit:
         if self.corr_key:
             self.get_correction(astrosensor)
         self.set_velocity(vel)
-        self.set_current_orientation(self.t-self.dt, self.t)
+        self.set_current_orientation()
         self.set_delta()
         self.set_gamma()
         sigma = self.get_control_moment()

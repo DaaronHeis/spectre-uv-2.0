@@ -1,2 +1,4 @@
 /etc/jupyter/nbconfig/notebook.d/
 /share/jupyter/
+/Lib/
+/condaenv/
