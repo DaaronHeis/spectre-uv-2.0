@@ -59,6 +59,7 @@ def init_target_orientation(angles_end, vel_end):
     l_k = ctrl.from_euler_to_quat(gamma_pr, 'YZXr')
     # l_pr = l_k.inverse() * l_0
     l_pr = qt.quaternion(1, 0, 0, 0)
+    # l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
     print('l_pr = ', l_pr)
     return l_pr, omega_pr
 
@@ -146,28 +147,29 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     results = {}
     results["Углы отклонения от заданной ориентации"] = [angles_out]
     results["Угловые скорости"] = [vel_out]
-    # results["Угловые скорости с учётом шума"] = [vel_noise_out]
-    # results["Кинетические моменты каждого ДМ"] = [H_dm_out]
-    # results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
+    results["Угловые скорости с учётом шума"] = [vel_noise_out]
+    results["Кинетические моменты каждого ДМ"] = [H_dm_out]
+    results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
     # results["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
     # results["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
-    # results["Скорости вращения ДМ"] = [w_dm_out]
+    results["Скорости вращения ДМ"] = [w_dm_out]
     results["Значения вектора управления по каждой оси"] = [sigma_out]
     results["Кватернион рассогласования"] = [l_delta_out]
-    # results["Кватернион текущей ориентации"] = [l_cur_out]
+    results["Кватернион текущей ориентации"] = [l_cur_out]
 
     handles = {}
-    handles["Углы отклонения от заданной ориентации"] = ["gamma", "theta", "psi"]
-    handles["Угловые скорости"] = ["w_x", "w_y", "w_z"]
-    # handles["Угловые скорости с учётом шума"] = ["w_x", "w,y", "w_z"]
-    # handles["Кинетические моменты каждого ДМ"] = ["H_1", "H_2", "H_3", "H_4"]
-    # handles["Кинетические моменты в проекциях на оси ССК"] = ["H_x", "H_y", "H_z"]
+    handles["Углы отклонения от заданной ориентации"] = ["град", "gamma", "theta", "psi"]
+    handles["Угловые скорости"] = ["град/с","w_x", "w_y", "w_z"]
+    handles["Угловые скорости с учётом шума"] = ["град/с","w_x", "w_y", "w_z"]
+    handles["Кинетические моменты каждого ДМ"] = ["Нмс","H_1", "H_2", "H_3", "H_4"]
+    handles["Кинетические моменты в проекциях на оси ССК"] = ["Нмс","H_x", "H_y", "H_z"]
     # handles["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
     # handles["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
-    # handles["Скорости вращения ДМ"] = ["w_1", "w_2", "w_3", "w_4"]
-    handles["Значения вектора управления по каждой оси"] = ["sigma_x", "sigma_y", "sigma_z"]
-    handles["Кватернион рассогласования"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
-    # handles["Кватернион текущей ориентации"] = ["lambda_0", "lambda_1", "lambda_2", "lambda_3"]
+    handles["Скорости вращения ДМ"] = ["рад/с","w_1", "w_2", "w_3", "w_4"]
+    handles["Значения вектора управления по каждой оси"] = ["Нм","sigma_x", "sigma_y", "sigma_z"]
+    handles["Кватернион рассогласования"] = ["","lambda_0", "lambda_1", "lambda_2", "lambda_3"]
+    handles["Кватернион текущей ориентации"] = ["","lambda_0", "lambda_1", "lambda_2", "lambda_3"]
+
 
     # интегрирование
     # TODO: переписать модульно, с учетом добавления новых модулей в будущем
@@ -227,13 +229,13 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         vel = vel + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
         results["Углы отклонения от заданной ориентации"].append(angles)
         results["Угловые скорости"].append(vel)
-        # results["Угловые скорости с учётом шума"].append(vel_noise)
-        # results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
-        # results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz)
-        # results["Скорости вращения ДМ"].append(np.array(w_self_dm))
+        results["Угловые скорости с учётом шума"].append(vel_noise)
+        results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
+        results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz)
+        results["Скорости вращения ДМ"].append(np.array(w_self_dm))
         results["Значения вектора управления по каждой оси"].append(np.array(sigma))
         results["Кватернион рассогласования"].append(l_delta)
-        # results["Кватернион текущей ориентации"].append(l_cur)
+        results["Кватернион текущей ориентации"].append(l_cur)
 
         k += 1
         t_curr += h
@@ -260,7 +262,7 @@ if __name__ == '__main__':
     elif t_span_variant == 3:
         t_span = [0, 6000]
     else:
-        t_span = [0, 600]
+        t_span = [0, 500]
 
     # такт вычислений
     dt = 0.25
@@ -283,7 +285,7 @@ if __name__ == '__main__':
         
         "Красивые" начальные углы: [35.0, 40.0, 20.0]   
     """
-    angles_0 = np.array([35.0, 40.0, 20.0]) * k
+    angles_0 = np.array([0.0, 90.0, 90.0]) * k
     angles_end = np.array([0.0, 0.0, 0.0]) * k
     vel_0 = np.array([0.0, 0.0, 0.0]) * k
     vel_end = np.array([0.0, 0.0, 0.0]) * k
@@ -310,14 +312,13 @@ if __name__ == '__main__':
         [vector/k for vector in results["Углы отклонения от заданной ориентации"]]
     results["Угловые скорости"] = \
         [vector/k for vector in results["Угловые скорости"]]
-    """
     results["Угловые скорости с учётом шума"] = \
-        [vector/k for vector in results["Угловые скорости с учётом шума"]]"""
+        [vector/k for vector in results["Угловые скорости с учётом шума"]]
 
     # с этого момента все углы в градусах
 
     # включение LaTeX
-    # plt.rcParams.update({"text.usetex":True})
+    # plt.rcParams.update({"text.usetex": True})
 
     a = results["Углы отклонения от заданной ориентации"]
     a = a[len(a)-1]
@@ -333,13 +334,15 @@ if __name__ == '__main__':
         fig = plt.figure(i)
         a = results[u]
         b = handles[u]
-        n = len(a[0])
+        n = len(b)
         labels = []
-        for j in range(n):
-            labels.append(b[j])
+        for j in range(n-1):
+            labels.append(b[j+1])
         plt.plot(t, a, label=labels)
         plt.title(u)
         plt.legend()
+        plt.xlabel("Время, с")
+        plt.ylabel(b[0])
         plt.grid(True)
         i += 1
     plt.show()
