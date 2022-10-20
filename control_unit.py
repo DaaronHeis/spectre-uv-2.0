@@ -194,6 +194,7 @@ def add_angular_velocity_noise(w: np.array, t, dt):
             w: np.float 3x1 - "чистая" текущая угловая скорость
             t: текущее время моделирования
             dt: шаг интегрирования
+
         Возвращает
         ----------
             w_noise: np.float 3x1 - "грязная" угловая скорость
@@ -213,31 +214,74 @@ def add_angular_velocity_noise(w: np.array, t, dt):
     return w_noise
 
 
+# TODO: подобрать матрицу фильтра
 class AstroSensor:
     """
         Матмодель астродатчика
-        Пока необходимо лишь рассчитывать угловую скорость коррекции
+        Измеряет (или каким-то другим образом получает) независимую от полученной интегрированием ориентацию КА,
+        по которой, используя фильтр Чебышева 2-го рода (2 пор.), получает угловую скорость астрокоррекции
     """
-    def __init__(self, omega_cor):
+    def __init__(self, w_cor, l_meas):
 
-        self.name = '348K'
-        self.omega_cor = omega_cor
+        self.name = '348K'              # имя астродатчика (из документации)
+        self.l_meas = l_meas            # текущий кватернион ориентации, измеренный астродатчиком
+        self.l_cor = l_meas             # текущий кватернион коррекции
+        self.w_cor = w_cor              # текущая угловая скорость астрокоррекции, расчитанная астродатчиком
+        self.K = np.diag([0, 0, 0])     # матрица фильтра
 
-    def set_correction(self, omega, omega_noise):
+    # TODO: прописать шум
+    def add_noise(self, l):
         """
-            Пока принимает угловую скорость коррекции снаружи, а не рассчитывает сам, потому
-            что пока она равняется угловой сорости, добавленной из-за шумов
+            Добавление погрешностей измерения астродатчика
+        """
+        return l*0.99
+
+    def set_current_orientation(self, l, w, w_prev, dt):
+        """
+            Так как звездное небо не моделируется, то измерения взять неоткуда, поэтому текущая ориентация
+            КА получается интегрированием незашумленной угловой скорости таким же образом, что и в СУ
 
             Параметры
             ------------
-            omega: np.array 3х1 - чистая угловая скорость
-            omega_noise: np.array 3x1 - угловая скорость с шумами
+            w: np.array 3х1 - текущая угловая скорость
+            w_prev: np.array 3x1 - прошлая угловая скорость
+            dt: float - шаг интегрироваия
         """
-        self.omega_cor = -(omega_noise - omega)
+        self.l_meas = integrate_angular_velocity(l, w, w_prev, dt)
 
-    def get_correction(self):
+    def set_correction(self, l, w, w_prev, dt):
+        """
+            Определяет текущую ориентацию аппарата и
+            соответствующую угловую скорость астрокоррекции
 
-        return self.omega_cor
+            Параметры
+            ------------
+            w: np.array 3х1 - текущая угловая скорость
+            w_prev: np.array 3x1 - прошлая угловая скорость
+            dt: float - шаг интегрироваия
+        """
+        """ Получение текущей ориентации """
+        self.set_current_orientation(l, w, w_prev, dt)
+        l_cur = self.l_meas
+        self.l_meas = self.add_noise(self.l_meas)
+
+        """ Вычисление угловой скорости астрокоррекции """
+        self.l_cor = self.l_meas.inverse() * l_cur
+        l_delta = qt.as_float_array(self.l_cor)
+        fi = [0, 0, 0]
+        fi[0] = 2 * l_delta[0] * l_delta[1]
+        fi[1] = 2 * l_delta[0] * l_delta[2]
+        fi[2] = 2 * l_delta[0] * l_delta[3]
+        fi = np.array(fi)
+        self.w_cor = -self.K @ fi
+
+    def get_correction(self, l, w, w_prev, dt):
+        """
+            Вычисляет угловую скорость астрокоррекции и возвращает её.
+            Вызывается из модуля СУ
+        """
+        self.set_correction(l, w, w_prev, dt)
+        return self.w_cor
 
 
 class ControlUnit:
@@ -328,7 +372,7 @@ class ControlUnit:
 
     def get_correction(self, astrosensor):
         """ Получение угловой скорости коррекции от астродатчика """
-        self.omega_cor = astrosensor.get_correction()
+        self.omega_cor = astrosensor.get_correction(self.l_cur, self.omega, self.omega_prev, self.dt)
 
     def get_control_moment(self):
         """ Получение управляющего момента """
@@ -336,6 +380,7 @@ class ControlUnit:
             and abs(self.gamma[1]) < self.threshold
             and abs(self.gamma[2]) < self.threshold):
             # стабилизация
+
             if self.flag == False:
                 self.flag = True
                 print(self.t, self.flag)
@@ -344,6 +389,7 @@ class ControlUnit:
             #sigma = sigma + np.sign(sigma)*0.0012
         else:
             # перенацеливание
+
             if self.flag == True:
                 self.flag = False
                 print(self.t, self.flag)
@@ -351,6 +397,7 @@ class ControlUnit:
             # sigma = - self.K2_pt @ self.omega_delta
             sigma = -self.K1_pt @ self.gamma - self.K2_pt @ self.omega
 
+        # насыщение управления
         for i in range(len(sigma)):
             if abs(sigma[i]) > self.sigma_max:
                 sigma[i] = self.sigma_max * np.sign(sigma[i])
@@ -367,10 +414,13 @@ class ControlUnit:
         omega = [self.omega[0], self.omega[1], self.omega[2]]
         self.l_cur = integrate_angular_velocity(self.l_cur, omega, omega_prev, self.dt)
 
+    # TODO: в зависимости от начальных ключей (которые тоже нужно добавить), реализовать зашумление и коррекцию
     def set_velocity(self, omega):
         """ Запоминание угловой скорости для интегрирования при вычислении ориентации """
         self.omega_prev = self.omega
-        self.omega = omega + self.omega_cor
+        self.omega = omega
+        if self.corr_key:
+            self.omega += self.omega_cor
 
     def update(self, vel, astrosensor):
         """

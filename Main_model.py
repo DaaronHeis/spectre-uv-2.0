@@ -2,8 +2,6 @@
     Основные уравнения динамики КА и их решение
 """
 
-# TODO: перейти с quaternion на quaternionic
-
 import numpy as np
 import quaternion as qt
 import matplotlib.pyplot as plt
@@ -58,8 +56,8 @@ def init_target_orientation(angles_end, vel_end):
     gamma_pr = angles_end.copy()
     l_k = ctrl.from_euler_to_quat(gamma_pr, 'YZXr')
     # l_pr = l_k.inverse() * l_0
-    l_pr = qt.quaternion(1, 0, 0, 0)
-    #l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
+    #l_pr = qt.quaternion(1, 0, 0, 0)
+    l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
     print('l_pr = ', l_pr)
     return l_pr, omega_pr
 
@@ -116,7 +114,7 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
     [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_curr-dt, dt)
 
     # инициализация астродатчика
-    astrosensor = ctrl.AstroSensor(vel)
+    astrosensor = ctrl.AstroSensor(l_0, np.array([0,0,0]))
 
     # начальные условия
     k = 0
@@ -185,7 +183,7 @@ def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I):
         vel_noise = ctrl.add_angular_velocity_noise(vel, t_curr, dt)
 
         # расчет управляющего момента
-        astrosensor.set_correction(vel, vel_noise)
+        # astrosensor.set_correction(vel, vel_noise)
         sigma = ctrl_unit.update(vel_noise, astrosensor)
         sigma = [sigma[0], sigma[1], sigma[2]]
 
