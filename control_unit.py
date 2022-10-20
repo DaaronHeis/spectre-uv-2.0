@@ -163,7 +163,7 @@ def integrate_angular_velocity(L: qt.quaternion, w, w_prev, dt):
             dt: float - шаг интегрирования
 
         Возвращает:
-            q: quaternion - кватернион поворота
+            L_rotated: quaternion - кватернион ориентации после поворота
     """
     avg_w = [0.0, 0.0, 0.0]
     avg_w[0] = 0.5 * (w[0] + w_prev[0])
@@ -221,22 +221,27 @@ class AstroSensor:
         Измеряет (или каким-то другим образом получает) независимую от полученной интегрированием ориентацию КА,
         по которой, используя фильтр Чебышева 2-го рода (2 пор.), получает угловую скорость астрокоррекции
     """
-    def __init__(self, w_cor, l_meas):
+    def __init__(self, L_meas, w_cor, ERROR_KEY):
 
-        self.name = '348K'              # имя астродатчика (из документации)
-        self.l_meas = l_meas            # текущий кватернион ориентации, измеренный астродатчиком
-        self.l_cor = l_meas             # текущий кватернион коррекции
-        self.w_cor = w_cor              # текущая угловая скорость астрокоррекции, расчитанная астродатчиком
-        self.K = np.diag([0, 0, 0])     # матрица фильтра
+        self.name = '348K'                              # имя астродатчика (из документации)
+        self.L_meas = L_meas                            # текущий кватернион ориентации, измеренный астродатчиком
+        self.L_cor = L_meas                             # текущий кватернион коррекции
+        self.w_cor = w_cor                              # текущая рассчитанная угловая скорость астрокоррекции
+        self.K = np.diag([0.1, 0.1, 0.1])               # матрица фильтра
+        self.delta = 15.0 / 60**3                       # погрешность измерения астродатчика
+        self.ERROR_KEY = ERROR_KEY                      # флаг учёта погрешностей измерения
 
-    # TODO: прописать шум
-    def add_noise(self, l):
+    def add_noise(self):
         """
             Добавление погрешностей измерения астродатчика
-        """
-        return l*0.99
 
-    def set_current_orientation(self, l, w, w_prev, dt):
+            Параметры
+            ------------
+            L: quaternion - измеренный кватернион ориентации
+        """
+        self.L_meas *= qt.quaternion(1, self.delta, self.delta, self.delta)
+
+    def set_current_orientation(self, L_old, w, w_prev, dt):
         """
             Так как звездное небо не моделируется, то измерения взять неоткуда, поэтому текущая ориентация
             КА получается интегрированием незашумленной угловой скорости таким же образом, что и в СУ
@@ -247,9 +252,9 @@ class AstroSensor:
             w_prev: np.array 3x1 - прошлая угловая скорость
             dt: float - шаг интегрироваия
         """
-        self.l_meas = integrate_angular_velocity(l, w, w_prev, dt)
+        self.L_meas = integrate_angular_velocity(L_old, w, w_prev, dt)
 
-    def set_correction(self, l, w, w_prev, dt):
+    def set_correction(self, L_old, w, w_prev, dt):
         """
             Определяет текущую ориентацию аппарата и
             соответствующую угловую скорость астрокоррекции
@@ -261,26 +266,27 @@ class AstroSensor:
             dt: float - шаг интегрироваия
         """
         """ Получение текущей ориентации """
-        self.set_current_orientation(l, w, w_prev, dt)
-        l_cur = self.l_meas
-        self.l_meas = self.add_noise(self.l_meas)
+        self.set_current_orientation(L_old, w, w_prev, dt)
+        L_cur = self.L_meas
+        if self.ERROR_KEY:
+            self.add_noise()
 
         """ Вычисление угловой скорости астрокоррекции """
-        self.l_cor = self.l_meas.inverse() * l_cur
-        l_delta = qt.as_float_array(self.l_cor)
+        self.L_cor = self.L_meas.inverse() * L_cur
+        L_delta = qt.as_float_array(self.L_cor)
         fi = [0, 0, 0]
-        fi[0] = 2 * l_delta[0] * l_delta[1]
-        fi[1] = 2 * l_delta[0] * l_delta[2]
-        fi[2] = 2 * l_delta[0] * l_delta[3]
+        fi[0] = 2 * L_delta[0] * L_delta[1]
+        fi[1] = 2 * L_delta[0] * L_delta[2]
+        fi[2] = 2 * L_delta[0] * L_delta[3]
         fi = np.array(fi)
         self.w_cor = -self.K @ fi
 
-    def get_correction(self, l, w, w_prev, dt):
+    def get_correction(self, L_old, w, w_prev, dt):
         """
             Вычисляет угловую скорость астрокоррекции и возвращает её.
             Вызывается из модуля СУ
         """
-        self.set_correction(l, w, w_prev, dt)
+        self.set_correction(L_old, w, w_prev, dt)
         return self.w_cor
 
 
@@ -292,7 +298,7 @@ class ControlUnit:
     def __init__(self, l_pr: qt.quaternion,
                        l_cur: qt.quaternion,
                        l_delta: qt.quaternion,
-                       omega, gamma, omega_pr, I, w_bw, sigma_max, t, dt, corr_key: bool):
+                       omega, gamma, omega_pr, I, w_bw, sigma_max, t, dt, CORR_KEY: bool, GIVUS_ERR_KEY: bool):
         """
             Кватернионы ориентации отсчитываются от ЭСК-2. То есть, высчитывается положение
             начальной точки поворота, конечной точки в ЭСК-2, и затем рассчитывается по этим известным
@@ -336,7 +342,7 @@ class ControlUnit:
         self.K2_pt = np.diag([1.35, 4.55, 4.85]) * 1.1
 
         self.K1_st = np.diag([0.05, 0.0875, 0.1175]) * 0.5
-        self.K2_st = np.diag([1.95, 3.75, 4.85]) * 0.9
+        self.K2_st = np.diag([1.75, 3.85, 4.65]) * 0.9
 
         self.threshold = 3 / 180 * np.pi                        # порог переключения
 
@@ -352,10 +358,11 @@ class ControlUnit:
 
         self.sigma_max = sigma_max
         self.w_bw = w_bw
-        self.flag = False
+        self.flag = False                                       # флаг перехода в режим стабилизации
         self.dt = dt
         self.t = t
-        self.corr_key = corr_key                                # ключ, подключающий коррекцию по астродатчику
+        self.corr_key = CORR_KEY                                # ключ, подключающий коррекцию по астродатчику
+        self.vel_key = GIVUS_ERR_KEY                            # ключ, подключающий погрешности измерения ГИВУСа
 
     def set_gamma(self):
         """ Определение вектора углового положения КА """
@@ -368,7 +375,6 @@ class ControlUnit:
     def set_delta(self):
         """ Вычисление кватерниона рассогласования """
         self.l_delta = self.l_pr.inverse() * self.l_cur
-        # self.omega_delta = self.omega - self.omega_pr
 
     def get_correction(self, astrosensor):
         """ Получение угловой скорости коррекции от астродатчика """
@@ -379,8 +385,8 @@ class ControlUnit:
         if (abs(self.gamma[0]) < self.threshold
             and abs(self.gamma[1]) < self.threshold
             and abs(self.gamma[2]) < self.threshold):
-            # стабилизация
 
+            # стабилизация
             if self.flag == False:
                 self.flag = True
                 print(self.t, self.flag)
@@ -388,8 +394,8 @@ class ControlUnit:
             sigma = -(self.K1_st @ self.gamma + self.K2_st @ self.omega_delta)
             #sigma = sigma + np.sign(sigma)*0.0012
         else:
-            # перенацеливание
 
+            # перенацеливание
             if self.flag == True:
                 self.flag = False
                 print(self.t, self.flag)
@@ -414,11 +420,12 @@ class ControlUnit:
         omega = [self.omega[0], self.omega[1], self.omega[2]]
         self.l_cur = integrate_angular_velocity(self.l_cur, omega, omega_prev, self.dt)
 
-    # TODO: в зависимости от начальных ключей (которые тоже нужно добавить), реализовать зашумление и коррекцию
     def set_velocity(self, omega):
         """ Запоминание угловой скорости для интегрирования при вычислении ориентации """
         self.omega_prev = self.omega
         self.omega = omega
+        if self.vel_key:
+            self.omega = add_angular_velocity_noise(self.omega, self.t, self.dt)
         if self.corr_key:
             self.omega += self.omega_cor
 
