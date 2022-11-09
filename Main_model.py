@@ -7,12 +7,11 @@ import quaternion as qt
 import matplotlib.pyplot as plt
 import flywheel_engine as dm
 import control_unit as ctrl
+import solar_panels_constants as spc
 
 
-# Решение дифференциальных уравнений в конкретный момент времени
-# На вход получает моменты, кинетические моменты ДМ и проекции
-# угловой скорости на ССК
 def f(w, M, H, HH, I):
+    # TODO: добавить колебательность
     """
         Диффуры динамики КА
         Представляют из себя следующую систему:
@@ -80,7 +79,7 @@ def init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_begin, d
     return angles, vel, ctrl_unit
 
 
-def runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY):
+def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY):
     """
         t_span: float[1x2] - начальный и конечный моменты времени
         dt: float
@@ -291,7 +290,7 @@ if __name__ == '__main__':
         Выходные углы - это углы, которые получаются из текущего кватерниона ориентации
         Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
-    [t, results, handles] = runge_kutta(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I, CORR_KEY=True, A_S_ERR_KEY=True, GIVUS_ERR_KEY=True)
+    [t, results, handles] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I, CORR_KEY=True, A_S_ERR_KEY=True, GIVUS_ERR_KEY=True)
 
     # отображение графиков
     n = len(t)
