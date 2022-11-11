@@ -202,19 +202,18 @@ def add_angular_velocity_noise(w: np.array, t, dt):
     w_noise = w.copy()
 
     # добавление случайного дрейфа
-    step_size = 0.0005 / 3600 * dt
+    step_size = 0.0005 / 3600 /2/3.1415926 * dt
     sigma = (step_size**2) * t/dt
-    w_noise += random.choice([-1, 1]) * np.sqrt(sigma) + random.choice([-1, 1])*0.00002
+    w_noise += random.choice([-1, 1]) * np.sqrt(sigma) + random.choice([-1, 1])*0.0001
 
     # добавление нестабильности масштабного коэффициента
-    eps = 0.02 / 100
+    eps = 0.003 / 100
     dw = eps * w
     w_noise += random.choice([-1, 1]) * dw
 
     return w_noise
 
 
-# TODO: подобрать матрицу фильтра
 class AstroSensor:
     """
         Матмодель астродатчика
@@ -227,9 +226,11 @@ class AstroSensor:
         self.L_meas = L_meas                            # текущий кватернион ориентации, измеренный астродатчиком
         self.L_cor = L_meas                             # текущий кватернион коррекции
         self.w_cor = w_cor                              # текущая рассчитанная угловая скорость астрокоррекции
-        self.K = np.diag([0.1, 0.1, 0.1])               # матрица фильтра
-        self.delta = 15.0 / 60**3                       # погрешность измерения астродатчика
+#       self.K = np.diag([0.1, 0.1, 0.1])               # матрица фильтра
+        self.delta = 12.0 / 60/60/2/3.1415926           # погрешность измерения астродатчика
         self.ERROR_KEY = ERROR_KEY                      # флаг учёта погрешностей измерения
+        self.fi_prev = None
+        self.w_cor_prev = np.array([0.0, 0.0, 0.0])
 
     def add_noise(self):
         """
@@ -279,7 +280,14 @@ class AstroSensor:
         fi[1] = 2 * L_delta[0] * L_delta[2]
         fi[2] = 2 * L_delta[0] * L_delta[3]
         fi = np.array(fi)
-        self.w_cor = -self.K @ fi
+
+        if self.fi_prev is None:
+            self.fi_prev = fi
+        else:
+            # self.w_cor = -self.K @ fi
+            self.w_cor = 0.6628*fi + 0.6628*self.fi_prev - 0.3255*self.w_cor_prev
+            self.w_cor_prev = self.w_cor
+            self.fi_prev = fi
 
     def get_correction(self, L_old, w, w_prev, dt):
         """
