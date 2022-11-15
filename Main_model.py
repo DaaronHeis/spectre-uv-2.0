@@ -68,18 +68,19 @@ def init_start_orientation(angles_0):
     return l_0
 
 
-def init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_begin, dt, CORR_KEY, GIVUS_ERR_KEY):
+def init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_begin, dt,
+                      CORR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
     vel = vel_0.copy()
     l_cur = l_0.copy()
     l_delta = l_pr.inverse() * l_cur
     print('l_delta = ', l_delta)
     angles = np.array([2 * l_delta.w * l_delta.x, 2 * l_delta.w * l_delta.y, 2 * l_delta.w * l_delta.z])
     ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
-                                 I, w_bw, sigma_max, t_begin, dt, CORR_KEY, GIVUS_ERR_KEY)
+                                 I, w_bw, sigma_max, t_begin, dt, CORR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY)
     return angles, vel, ctrl_unit
 
 
-def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY):
+def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
     """
         t_span: float[1x2] - начальный и конечный моменты времени
         dt: float
@@ -110,7 +111,8 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
         Инициализация модуля управления здесь
         -------------------------------------
     """
-    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_curr-dt, dt, CORR_KEY, GIVUS_ERR_KEY)
+    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_curr-dt, dt,
+                                                 CORR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY)
 
     # инициализация астродатчика
     astrosensor = ctrl.AstroSensor(l_0, np.array([0,0,0]), A_S_ERR_KEY)
@@ -290,7 +292,11 @@ if __name__ == '__main__':
         Выходные углы - это углы, которые получаются из текущего кватерниона ориентации
         Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
-    [t, results, handles] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I, CORR_KEY=True, A_S_ERR_KEY=True, GIVUS_ERR_KEY=True)
+    [t, results, handles] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
+                                CORR_KEY=True,
+                                A_S_ERR_KEY=True,
+                                GIVUS_ERR_KEY=False,
+                                ARTIF_ERR_KEY=True)
 
     # отображение графиков
     n = len(t)
