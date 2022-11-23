@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import flywheel_engine as dm
 import control_unit as ctrl
 import solar_panels_constants as spc
+import updater as upd
 
 
 def f(w, M, H, HH, I):
@@ -35,6 +36,7 @@ def f(w, M, H, HH, I):
 
 
 def init_time(t_span, dt):
+    """ Инициализация временного отрезка моделирования """
     t_begin = t_span[0]
     t_end = t_span[1]
     h = dt
@@ -44,6 +46,7 @@ def init_time(t_span, dt):
 
 
 def init_flywheels(n, w_bw, sigma_max):
+    """ Инициализация двигателей-маховиков """
     dm_all = []
     for j in range(n):
         dm_all.append(dm.Flywheel(0,0,0,0,w_bw))
@@ -51,6 +54,7 @@ def init_flywheels(n, w_bw, sigma_max):
 
 
 def init_target_orientation(angles_end, vel_end):
+    """ Выставление требуемой ориентации через заданные углы """
     omega_pr = vel_end.copy()
     gamma_pr = angles_end.copy()
     l_k = ctrl.from_euler_to_quat(gamma_pr, 'YZXr')
@@ -62,22 +66,41 @@ def init_target_orientation(angles_end, vel_end):
 
 
 def init_start_orientation(angles_0):
+    """ Выставление начальной ориентации (сразу в виде кватерниона) """
     angles = angles_0
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
     print('l_0 = ', l_0)
     return l_0
 
 
-def init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_begin, dt,
-                      CORR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
+def init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max,
+                      CORR_KEY: bool, ARTIF_ERR_KEY: bool):
+    """ Инициализация модуля блока управления """
     vel = vel_0.copy()
     l_cur = l_0.copy()
     l_delta = l_pr.inverse() * l_cur
     print('l_delta = ', l_delta)
     angles = np.array([2 * l_delta.w * l_delta.x, 2 * l_delta.w * l_delta.y, 2 * l_delta.w * l_delta.z])
     ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
-                                 I, w_bw, sigma_max, t_begin, dt, CORR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY)
+                                 w_bw, sigma_max, CORR_KEY, ARTIF_ERR_KEY)
     return angles, vel, ctrl_unit
+
+
+def init_GIVUS(GIVUS_ERR_KEY: bool):
+    """ Инициализация модуля ГИВУСа """
+    givus = ctrl.GIVUS(GIVUS_ERR_KEY)
+    return givus
+
+
+def init_astrosensor(l_0, A_S_ERR_KEY: bool):
+    """ Инициализация модуля астродатчика """
+    astrosensor = ctrl.AstroSensor(l_0, np.array([0,0,0]), A_S_ERR_KEY)
+    return astrosensor
+
+def init_handler(t, dt, L_KA, w_KA):
+    """ Инициализация интерфейса - updater-a """
+    handler = upd.Updater(0,dt,L_KA,w_KA)
+    return handler
 
 
 def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
@@ -111,11 +134,13 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
         Инициализация модуля управления здесь
         -------------------------------------
     """
-    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, I, w_bw, sigma_max, t_curr-dt, dt,
-                                                 CORR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY)
+    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max,
+                                                 CORR_KEY, ARTIF_ERR_KEY)
 
-    # инициализация астродатчика
-    astrosensor = ctrl.AstroSensor(l_0, np.array([0,0,0]), A_S_ERR_KEY)
+    astrosensor = init_astrosensor(l_0, A_S_ERR_KEY)
+    givus = init_GIVUS(GIVUS_ERR_KEY)
+
+    handler = init_handler(t, dt, l_0, vel_0)
 
     # начальные условия
     k = 0
@@ -132,10 +157,10 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
     HH_xyz_out = np.array([0.0, 0.0, 0.0])
     sigma_out = np.array([0.0, 0.0, 0.0])
 
-    [a, b, c, d] = ctrl_unit.get_parameters()
-    a = qt.as_float_array(a)
+    params = ctrl_unit.get_parameters()
+    a = qt.as_float_array(params[0])
     l_cur_out = np.array([a[0], a[1], a[2], a[3]])
-    b = qt.as_float_array(b)
+    b = qt.as_float_array(params[1])
     l_delta_out = np.array([b[0], b[1], b[2], b[3]])
 
     # vel_noise_out = np.array(vel)
@@ -176,16 +201,17 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
 
         t.append(t_curr)
 
-        sigma = ctrl_unit.update(vel, astrosensor)
+        params = handler.update(vel, ctrl_unit, astrosensor, givus)
+        sigma = params[0]
         sigma = [sigma[0], sigma[1], sigma[2]]
 
         # получение текущих параметров модуля управления
-        [a, b, c, d] = ctrl_unit.get_parameters()
-        a = qt.as_float_array(a)
+        ctrl_unit_params = params[1].copy()
+        a = qt.as_float_array(ctrl_unit_params[0])
         l_cur = np.array([a[0], a[1], a[2], a[3]])
-        b = qt.as_float_array(b)
+        b = qt.as_float_array(ctrl_unit_params[1])
         l_delta = np.array([b[0], b[1], b[2], b[3]])
-        angles = c
+        angles = ctrl_unit_params[2].copy()
 
         # расчет динамического момента комплекса двигателей-маховиков
         Md = dm.update_block(sigma, dm_all)
@@ -295,7 +321,7 @@ if __name__ == '__main__':
     [t, results, handles] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
                                 CORR_KEY=True,
                                 A_S_ERR_KEY=True,
-                                GIVUS_ERR_KEY=False,
+                                GIVUS_ERR_KEY=True,
                                 ARTIF_ERR_KEY=True)
 
     # отображение графиков
