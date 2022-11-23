@@ -1,7 +1,4 @@
 from control_unit import *
-import numpy as np
-import quaternion as qt
-from copy import deepcopy
 
 
 class Updater:
@@ -49,7 +46,7 @@ class Updater:
         #                   !!!ВАЖНО!!!
         # TODO: попробовать сначала проинтегрировать, а потом проинтегрировать ещё раз с коррекцией
         CU.set_current_orientation(self.dt, Astro)
-        sigma = CU.get_control_moment()
+        sigma = CU.get_control_moment(self.t)
 
         # получение параметров модулей и их вывод
         CU_params = CU.get_parameters()

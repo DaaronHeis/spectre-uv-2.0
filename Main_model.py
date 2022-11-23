@@ -97,6 +97,7 @@ def init_astrosensor(l_0, A_S_ERR_KEY: bool):
     astrosensor = ctrl.AstroSensor(l_0, np.array([0,0,0]), A_S_ERR_KEY)
     return astrosensor
 
+
 def init_handler(t, dt, L_KA, w_KA):
     """ Инициализация интерфейса - updater-a """
     handler = upd.Updater(0,dt,L_KA,w_KA)
@@ -322,7 +323,7 @@ if __name__ == '__main__':
                                 CORR_KEY=True,
                                 A_S_ERR_KEY=True,
                                 GIVUS_ERR_KEY=True,
-                                ARTIF_ERR_KEY=True)
+                                ARTIF_ERR_KEY=False)
 
     # отображение графиков
     n = len(t)
