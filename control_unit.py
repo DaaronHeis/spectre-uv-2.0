@@ -259,7 +259,7 @@ class AstroSensor:
                 H(z^-1) = ------------------------------------
                            1 + 1.18(z^-1) + 0.4816(z^-2)
         """
-        self.k = 0.00001                                  # коэффициент усиления
+        self.k = 0.1                                  # коэффициент усиления
         self.n = 2                                      # порядок фильтра
         self.b = [0.6283, 1.257, 0.6283]                # коэффициенты b фильтра
         self.a = [1, 1.18, 0.4816]                      # коэффициенты а фильтра
@@ -473,6 +473,7 @@ class ControlUnit:
 
     def set_current_orientation(self, dt, astrosensor):
         """ Вычисление кватерниона текущей ориентации путем интегрирования уравнений движения """
+        omega = self.omega
         if self.key_orient_error is True:
             self.add_error_in_orientation()
         if self.key_corr is True:
@@ -493,7 +494,7 @@ class ControlUnit:
         Добавление искусственной ошибки при определении ориентации КА. Использовать для
         проверки работы астрокоррекции
         """
-        k = 0.001
+        k = 0.0001
         error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
         error_quat = error_quat.normalized()
         self.L_cur = self.L_cur*error_quat

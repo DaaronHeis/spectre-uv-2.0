@@ -7,13 +7,12 @@ import quaternion as qt
 import matplotlib.pyplot as plt
 import flywheel_engine as dm
 import control_unit as ctrl
-import solar_panels_constants as spc
 import updater as upd
+from dynamic_model_equations import runge_kutta
 
-
+"""
 def f(w, M, H, HH, I):
     # TODO: добавить колебательность
-    """
         Диффуры динамики КА
         Представляют из себя следующую систему:
             w' = A * [a] @ [sigma]
@@ -21,7 +20,6 @@ def f(w, M, H, HH, I):
             [a] и [sigma] - матрица 3х3 и 3х1 соответственно
             [a] - матрица моментов инерции
             [sigma] - вектор-столбец действующих моментов
-    """
     # ww = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
     A = 1/(I[0,0]*I[1,1]*I[2,2] - I[0,0]*I[1,2]**2 - I[1,1]*I[0,2]**2 - I[2,2]*I[0,1]**2 - 2*I[0,1]*I[0,2]*I[1,2])
     sigma = np.array([0.0, 0.0, 0.0])
@@ -33,6 +31,7 @@ def f(w, M, H, HH, I):
                   [I[1,1]*I[0,2]+I[0,1]*I[1,2], I[0,0]*I[1,2]+I[0,1]*I[0,2], I[0,0]*I[1,1]-I[0,1]**2]])
     ww = A * (a @ sigma.T)
     return ww
+"""
 
 
 def init_time(t_span, dt):
@@ -137,6 +136,15 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
     """
     [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max,
                                                  CORR_KEY, ARTIF_ERR_KEY)
+    q = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    dq = q.copy()
+
+    """
+        ------------------------------
+        Угол наклона солнечных панелей
+        ------------------------------
+    """
+    gamma = 0
 
     astrosensor = init_astrosensor(l_0, A_S_ERR_KEY)
     givus = init_GIVUS(GIVUS_ERR_KEY)
@@ -235,14 +243,8 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
         for j in range(3):
             M[j] = M0[j] + Md[j]
 
-        # коэффициенты для Рунге-Кутты
-        k1 = f(vel, M, H, HH, I)
-        k2 = f(vel + h*k1/2, M, H, HH, I)
-        k3 = f(vel + h*k2/2, M, H, HH, I)
-        k4 = f(vel + h*k3, M, H, HH, I)
+        [vel, q, dq] = runge_kutta(vel, q, dq, I, HH, H, M, gamma, h)
 
-        # формирование выходных массивов
-        vel = vel + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
         results["Углы отклонения от заданной ориентации"].append(angles)
         results["Проекции вектора угловой скорости на оси ССК"].append(vel)
         # results["Зашумленные проекции вектора угловой скорости на оси ССК"].append(vel_noise)
@@ -267,7 +269,7 @@ if __name__ == '__main__':
     # время интегрирования
     # TODO: написать нормальный интерфейс вместо постоянной правки кода
 
-    t_span_variant = 1
+    t_span_variant = 2
 
     if t_span_variant == 0:
         t_span = [0, 300]
@@ -323,7 +325,7 @@ if __name__ == '__main__':
                                 CORR_KEY=True,
                                 A_S_ERR_KEY=True,
                                 GIVUS_ERR_KEY=True,
-                                ARTIF_ERR_KEY=False)
+                                ARTIF_ERR_KEY=True)
 
     # отображение графиков
     n = len(t)
