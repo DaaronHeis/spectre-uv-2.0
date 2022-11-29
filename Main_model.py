@@ -10,29 +10,6 @@ import control_unit as ctrl
 import updater as upd
 from dynamic_model_equations import runge_kutta
 
-"""
-def f(w, M, H, HH, I):
-    # TODO: добавить колебательность
-        Диффуры динамики КА
-        Представляют из себя следующую систему:
-            w' = A * [a] @ [sigma]
-            phi' = w
-            [a] и [sigma] - матрица 3х3 и 3х1 соответственно
-            [a] - матрица моментов инерции
-            [sigma] - вектор-столбец действующих моментов
-    # ww = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
-    A = 1/(I[0,0]*I[1,1]*I[2,2] - I[0,0]*I[1,2]**2 - I[1,1]*I[0,2]**2 - I[2,2]*I[0,1]**2 - 2*I[0,1]*I[0,2]*I[1,2])
-    sigma = np.array([0.0, 0.0, 0.0])
-    sigma[0] = M[0] - (HH[0] + H[2]*w[1] - H[1]*w[2])
-    sigma[1] = M[1] - (HH[1] + H[0]*w[2] - H[2]*w[0])
-    sigma[2] = M[2] - (HH[2] + H[1]*w[0] - H[0]*w[1])
-    a = np.array([[I[1,1]*I[2,2]-I[1,2]**2, I[2,2]*I[0,1]+I[0,2]*I[1,2], I[1,1]*I[0,2]+I[0,1]*I[1,2]],
-                  [I[2,2]*I[0,1]+I[0,2]*I[1,2], I[0,0]*I[2,2]-I[0,2]**2, I[0,0]*I[1,2]+I[0,1]*I[0,2]],
-                  [I[1,1]*I[0,2]+I[0,1]*I[1,2], I[0,0]*I[1,2]+I[0,1]*I[0,2], I[0,0]*I[1,1]-I[0,1]**2]])
-    ww = A * (a @ sigma.T)
-    return ww
-"""
-
 
 def init_time(t_span, dt):
     """ Инициализация временного отрезка моделирования """
@@ -66,7 +43,7 @@ def init_target_orientation(angles_end, vel_end):
 
 def init_start_orientation(angles_0):
     """ Выставление начальной ориентации (сразу в виде кватерниона) """
-    angles = angles_0
+    angles = angles_0.copy()
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
     print('l_0 = ', l_0)
     return l_0
@@ -103,6 +80,7 @@ def init_handler(t, dt, L_KA, w_KA):
     return handler
 
 
+# TODO: полностью переписать, выбрав единую конвенцию для размерностей векторов
 def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
     """
         t_span: float[1x2] - начальный и конечный моменты времени
@@ -243,7 +221,11 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
         for j in range(3):
             M[j] = M0[j] + Md[j]
 
+        # интегрирование уравнений
         [vel, q, dq] = runge_kutta(vel, q, dq, I, HH, H, M, gamma, h)
+        vel = np.array(vel).reshape(3)
+        q = np.array(q).reshape(6)
+        dq = np.array(dq).reshape(6)
 
         results["Углы отклонения от заданной ориентации"].append(angles)
         results["Проекции вектора угловой скорости на оси ССК"].append(vel)

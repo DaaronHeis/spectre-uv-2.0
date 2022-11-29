@@ -171,11 +171,11 @@ def integrate_angular_velocity(L: qt.quaternion, w, w_prev, dt):
     avg_w[0] = 0.5 * (w[0] + w_prev[0])
     avg_w[1] = 0.5 * (w[1] + w_prev[1])
     avg_w[2] = 0.5 * (w[2] + w_prev[2])
-    len = np.sqrt(avg_w[0]**2 + avg_w[1]**2 + avg_w[2]**2)
-    theta = 0.5 * len * dt
-    if len > 1.0e-12:
+    length = np.sqrt(avg_w[0]**2 + avg_w[1]**2 + avg_w[2]**2)
+    theta = 0.5 * length * dt
+    if length > 1.0e-12:
         w = np.cos(theta)
-        s = np.sin(theta) / len
+        s = np.sin(theta) / length
         q = qt.quaternion(w, avg_w[0]*s, avg_w[1]*s, avg_w[2]*s)
         q = q.normalized()
     else:

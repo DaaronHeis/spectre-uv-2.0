@@ -60,21 +60,21 @@ def f(x, parameters):
     p22 = p[1][1]
     p23 = p[1][2]
     """
-    wx = x[0]
-    wy = x[1]
-    wz = x[2]
-    q11 = x[3]
-    q12 = x[4]
-    q13 = x[5]
-    q21 = x[6]
-    q22 = x[7]
-    q23 = x[8]
-    p11 = x[9]
-    p12 = x[10]
-    p13 = x[11]
-    p21 = x[12]
-    p22 = x[13]
-    p23 = x[14]
+    wx = x[0, 0]
+    wy = x[1, 0]
+    wz = x[2, 0]
+    q11 = x[3, 0]
+    q12 = x[4, 0]
+    q13 = x[5, 0]
+    q21 = x[6, 0]
+    q22 = x[7, 0]
+    q23 = x[8, 0]
+    p11 = x[9, 0]
+    p12 = x[10, 0]
+    p13 = x[11, 0]
+    p21 = x[12, 0]
+    p22 = x[13, 0]
+    p23 = x[14, 0]
 
     I = parameters['I']
     dH = parameters['dH']
@@ -97,7 +97,6 @@ def f(x, parameters):
     Mx = M[0]
     My = M[1]
     Mz = M[2]
-    
 
     """ Промежуточные коэффициенты """
     s1 = (Iz-Iy)*wz*wy + Iyz*(wz**2-wy**2) + Ixy*wx*wz-Ixz*wx*wy + dHx+Hz*wy-Hy*wz - Mx
@@ -193,7 +192,7 @@ def runge_kutta(w, q, dq, I, dH, H, M, gamma, h):
     k4 = f(x + h*k3, const_parameters)
 
     x = x + h/6 * (k1 + 2*k2 + 2*k3 + k4)
-    x = x.to_list()
+    x = x.tolist()
     w = x[0:3]
     q = x[3:9]
     dq = x[9:15]
