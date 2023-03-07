@@ -3,7 +3,7 @@
 """
 
 import numpy as np
-from numpy.linalg import inv
+from numpy.linalg import inv, det
 from solar_panel_constants import *
 
 
@@ -20,23 +20,39 @@ def f(x, parameters):
         Вектор х = [wx wy wz q11 q12 q13 q21 q22 q23 p11 p12 p13 p21 p22 p23]'
 
         Уравнения динамики:
+
         Ix*dwx - Ixy*dwy - Ixz*dwz + s41*dp11 + s51*dp12 + s61*dp13 + s71*dp21 + s81*dp22 + s91*dp23 = -s1;
+
         -Ixy*dwx + Iy*dwy - Iyz*dwz + s42*dp11 + s52*dp12 + s62*dp13 + s72*dp21 + s82*dp22 + s92*dp23 = -s2;
+
         -Ixz*dwx - Iyz*dwy + Iz*dwz + s43*dp11 + s53*dp12 + s63*dp13 + s73*dp21 + s83*dp22 + s93*dp23 = -s3;
+
         s41*dwx + d42*dwy + s43*dwz + eps11*dq11 + dp11 = -o11*q11;
+
         s51*dwx + d52*dwy + s53*dwz + eps12*dq12 + dp12 = -o12*q12;
+
         s61*dwx + d62*dwy + s63*dwz + eps13*dq13 + dp13 = -o13*q13;
+
         s71*dwx + d72*dwy + s73*dwz + eps21*dq21 + dp21 = -o21*q21;
+
         s81*dwx + d82*dwy + s83*dwz + eps22*dq22 + dp22 = -o22*q22;
+
         s91*dwx + d92*dwy + s93*dwz + eps23*dq23 + dp23 = -o23*q23;
+
         dq11 = p11;
+
         dq12 = p12;
+
         dq13 = p13;
+
         dq21 = p21;
+
         dq22 = p22;
+
         dq23 = p23;
-        -----
-        Возвращает:
+        
+        Возвращает
+        ----------
             dx - производные компонент вектора х
     """
 
@@ -170,14 +186,17 @@ def f(x, parameters):
     return dx
 
 
-def runge_kutta(w, q, dq, I, dH, H, M, gamma, h):
+def runge_kutta(h, w, q, dq, I, dH, H, M, gamma):
     """ 
         Интегрирование уравнений динамики методом Рунге-Кутты 
 
-        -----
-        Возвращает проинтегрированные
+        Возвращает
+        ----------
+        проинтегрированные
             w - вектор угловой скорости КА
+
             q - колебательные координаты КА
+
             dq - скорость изменения колебательных координат КА    
     """
 
@@ -199,4 +218,91 @@ def runge_kutta(w, q, dq, I, dH, H, M, gamma, h):
 
     return [w, q, dq]
 
-    
+
+def runge_kutta_in_state_form(h, x, parameters):
+    """ 
+        Интегрирование уравнений динамики методом Рунге-Кутты 
+        x - numpy array - искходный вектор состояния
+        h = dt - шаг интегрирования
+        parameters = {'I': I, 'dH': dH, 'H': H, 'M': M, 'g': gamma}
+
+        Возвращает 
+        ----------
+        проинтегрированный
+            x - numpy array - вектор состояния   
+    """
+
+    # параметры КА, остающиеся постоянными при интегрировании, т.е. считаются константами
+    const_parameters = parameters
+    k1 = f(x, const_parameters)
+    k2 = f(x + h*k1/2, const_parameters)
+    k3 = f(x + h*k2/2, const_parameters)
+    k4 = f(x + h*k3, const_parameters)
+
+    x = x + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+    return x
+
+
+def runge_kutta_prototype(h, key, *args):
+    """ 
+        Интегрирование уравнений динамики методом Рунге-Кутты 
+
+        Принимает
+        ---------
+        h - шаг интегрирования
+
+        key - ключ, каки именно параметры передались:
+            - 'state': вектор состояния и словарь параметров
+             (x: numpy array, parameters: dict{'I': I, 'dH': dH, 'H': H, 'M': M, 'g': gamma})
+            - 'values': составляющие вектора состояния и неизменные параметры по отдельности
+             (w: list[3], q[6], dq[6], I, dH, H, M, gamma)
+
+        Возвращает
+        ----------
+        проинтегрированные
+            x - вектор состояния
+
+            w - вектор угловой скорости КА
+
+            q - колебательные координаты КА
+
+            dq - скорость изменения колебательных координат КА    
+    """
+    if key == 'state':
+        x = args[0]
+        const_parameters = args[1]
+        k1 = f(x, const_parameters)
+        k2 = f(x + h*k1/2, const_parameters)
+        k3 = f(x + h*k2/2, const_parameters)
+        k4 = f(x + h*k3, const_parameters)
+
+        x = x + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+        return x
+
+    elif key == 'values':
+        w = args[0]
+        q = args[1]
+        dq = args[2]
+        I = args[3]
+        dH = args[4]
+        H = args[5]
+        M = args[6]
+        gamma = args[7]
+        const_parameters = {'I': I, 'dH': dH, 'H': H, 'M': M, 'g': gamma}
+        x = np.array([[w[0]],[w[1]],[w[2]],
+                    [q[0]],[q[1]],[q[2],],[q[3]],[q[4]],[q[5]],
+                    [dq[0]],[dq[1]],[dq[2],],[dq[3]],[dq[4]],[dq[5]]])
+        k1 = f(x, const_parameters)
+        k2 = f(x + h*k1/2, const_parameters)
+        k3 = f(x + h*k2/2, const_parameters)
+        k4 = f(x + h*k3, const_parameters)
+
+        x = x + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+        x = x.tolist()
+        w = x[0:3]
+        q = x[3:9]
+        dq = x[9:15]
+
+        return [w, q, dq]

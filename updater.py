@@ -23,6 +23,7 @@ class Updater:
         self.L_KA_prev = L_KA.copy()
         self.w_KA = w_KA
         self.w_KA = w_KA.copy()
+        self.w_KA_prev = w_KA
 
     def update(self, vel, CU:ControlUnit, Astro: AstroSensor, Gyro: GIVUS):
         """
@@ -40,7 +41,8 @@ class Updater:
         # измерение угловой скорости ГИВУСом и получение базовой (измеренной) ориентации ЗД
         w_meas = Gyro.measure_velocity(self.w_KA, self.t, self.dt)
         CU.set_current_velocity(w_meas)
-        Astro.set_current_orientation(self.L_KA)
+
+        Astro.set_current_orientation(self.L_KA, CU.is_stabilisation())
 
         # интегрирование уравнения кинематики и астрокоррекция
         #                   !!!ВАЖНО!!!
