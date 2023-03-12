@@ -241,7 +241,7 @@ class GIVUS:
         # добавление случайного дрейфа (angular random walk)
         step_size = self.bias_stab/3600/180*pi * dt
         sigma = (step_size**2) * t/dt
-        w += random.choice([-1, 1]) * np.sqrt(sigma) + random.choice([-1, 1])*self.noise
+        w += random.choice([-1, 1]) * np.sqrt(sigma) + random.choice([-1, 1])*self.noise/180*pi
 
         # добавление нестабильности масштабного коэффициента
         dw = self.scale_factor * w
@@ -270,7 +270,7 @@ class AstroSensor:
         self.L_meas = L_meas                            # текущий кватернион ориентации, измеренный астродатчиком
         self.L_cor = qt.quaternion(1,0,0,0)             # текущий кватернион коррекции
         self.w_cor = w_cor                              # текущая рассчитанная угловая скорость астрокоррекции
-        self.delta = 12.0 / 60/60/2/3.1415926           # погрешность измерения астродатчика
+        self.delta = 12.0 / 3600 / 180*pi               # погрешность измерения астродатчика
         self.key_noise = ERROR_KEY                      # ключ учёта погрешностей измерения
         self.UKF = UKF
         """
@@ -281,7 +281,7 @@ class AstroSensor:
                 H(z^-1) = ------------------------------------
                            1 + 1.18(z^-1) + 0.4816(z^-2)
         """
-        self.k = 1                                    # коэффициент усиления
+        self.k = 0.5                                    # коэффициент усиления
         self.n = 2                                      # порядок фильтра
         self.b = [0.6283, 1.257, 0.6283]                # коэффициенты b фильтра
         self.a = [1, 1.18, 0.4816]                      # коэффициенты а фильтра
@@ -335,7 +335,7 @@ class AstroSensor:
         self.w_cor = self.UKF.filter(self.L_meas, w)
         # for i in range(3):
         #     if abs(self.w_cor[i]) >= 0.1:
-        #         self.w_cor[i] = 0.1
+        #         self.w_cor[i] = 0
 
     def get_correction(self, w_from_CU):
         """
@@ -398,13 +398,14 @@ class ControlUnit:
         # коэффициенты управления для перенацеливания
         # self.K1_pt = np.diag([0.0675, 0.0675, 0.0775]) * 0.6
         # self.K2_pt = np.diag([4.85, 6.85, 6.55]) * 0.8
-        self.K1_pt = np.diag([0.03, 0.1175, 0.1175]) * 0.6
-        self.K2_pt = np.diag([1.35, 4.55, 4.85]) * 1.1
+        self.K1_pt = np.diag([0.025, 0.1275, 0.08175]) * 0.6
+        self.K2_pt = np.diag([1.35, 4.55, 4.75]) * 1.1
 
-        self.K1_st = np.diag([0.025, 0.04375, 0.05875]) * 1
-        self.K2_st = np.diag([1.755, 3.375, 4.365]) * 1
+        self.K1_st = np.diag([0.025, 0.05375, 0.06875]) * 1
+        self.K2_st = np.diag([1.755, 4.175, 4.165]) * 1
 
-        self.threshold = 3 / 180 * np.pi                        # порог переключения
+        self.threshold = 3 / 180 * pi                           # порог переключения
+        self.corr_threshold = 0.2 / 180 * pi                    # порог выключения астродатчика
 
         self.omega_measured = omega                             # текущее измерение угловой скорости ГИВУСом
         self.omega = omega                                      # текущий вектор угловой скорости (со всеми шумами и коррекциями)
@@ -437,6 +438,8 @@ class ControlUnit:
     def get_correction(self, astrosensor):
         """ Получение угловой скорости коррекции от астродатчика """
         self.omega_cor = astrosensor.get_correction(self.omega)
+        if any(self.omega > self.corr_threshold):
+            self.omega_cor = np.zeros(3)
 
     def get_control_moment(self, t):
         """ Расчёт и получение управляющего момента """

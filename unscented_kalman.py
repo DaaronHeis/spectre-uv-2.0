@@ -26,6 +26,8 @@
         - обновляется достоверность состояния на основе точности измерения
 """
 
+# TODO: переписать как линейный (функционал уже как у линейного, осталось только оформить красиво)
+
 import numpy as np
 import quaternion as qt
 from scipy.linalg import cholesky 
@@ -34,10 +36,14 @@ from control_unit import integrate_angular_velocity
 
 
 class UnscentedKalmanFilter:
-
+    """
+        Раньше был реализован нелинейный вариант, после совещания с научником
+        было решено реализовать линейную модель
+    """
     def __init__(self, x, P, Q, R, dt, L_pr, alpha, beta, kappa):
 
         self.x = x              # вектор состояния
+        self.x_prev = x
         self.x_predicted = x    # предсказанный вектор состояния
         self.P = P              # матрица ковариации 
         self.P_predicted = P    # предсказанная матрица ковариации
@@ -46,7 +52,11 @@ class UnscentedKalmanFilter:
         self.n = x.shape[0]     # размерность вектора состояния
         self.dt = dt            # такт работы системы
         self.L_pr = L_pr        # кватернион программмной ориентации
-        
+
+        self.F = np.eye(3)          # матрица F процесса
+        self.H = np.eye(3)          # матрица H измерений
+        self.B = np.eye(3) * dt     # матрица B управления
+
         self.alpha = alpha      # параметр генерации сигма-точек
         self.beta = beta        # параметр генерации сигма-точек
         self.kappa = kappa      # параметр генерации сигма-точек
@@ -104,18 +114,6 @@ class UnscentedKalmanFilter:
 
         return x, P
 
-    def to_quat(self, x):
-        sigma = x[0]**2 + x[1]**2 + x[2]**2
-        l0_1 = np.sqrt((1 + np.sqrt(1 - sigma)) / 2)
-        l0_2 = np.sqrt((1 + np.sqrt(1 + sigma)) / 2)
-        l0_3 = -np.sqrt((1 + np.sqrt(1 - sigma)) / 2)
-        l0_4 = -np.sqrt((1 + np.sqrt(1 + sigma)) / 2)
-
-        l1 = x[0] / 2 / l0
-        l2 = x[1] / 2 / l0
-        l3 = x[2] / 2 / l0
-        return qt.quaternion(l0, l1, l2, l3)
-
     def fx(self, x, u):
         """
             Модель системы
@@ -153,15 +151,21 @@ class UnscentedKalmanFilter:
 
             Обновляет предсказанные состояние и ковариацию
         """
+        """
         mu = self.x
         sigmas, self.Wm, self.Wc = self.compute_sigma_points(mu)
         for i in range(self.num_sigmas):
             self.sigmas_f[i] = self.fx(sigmas[i], u)
         self.x_predicted, self.P_predicted = self.unscented_transform(self.sigmas_f, self.Wm, self.Wc)
+        """
+
+        self.x_predicted = self.F @ self.x + self.B @ u
+        self.P_predicted = self.F @ self.P @ self.F.T + self.Q
 
     def update(self, z):
         """
             Коррекция
+        """
         """
         sigmas_f = self.sigmas_f
         sigmas_h = self.sigmas_h
@@ -185,17 +189,24 @@ class UnscentedKalmanFilter:
         y = z - z_predicted
         self.x = self.x_predicted + K @ y
         self.P = self.P_predicted - K @ Pz @ K.T
+        """
+        y = z - self.H @ self.x_predicted
+        S = self.H @ self.P_predicted @ self.H.T + self.R
+        K = self.P_predicted @ self.H.T @ np.linalg.inv(S)
+
+        self.x = self.x_predicted + K @ y
+        self.P = (np.eye(3) - K @ self.H) @ self.P_predicted
 
     def get_measurements(self, L):
         """
             Метод, преобразовывающий полученный от астродатчика кватернион рассогласования в пространство состояния
         """
-        L = self.L_pr.inverse() * L
-        L = qt.as_float_array(L)
+        l = self.L_pr.inverse() * L
+        l = qt.as_float_array(l)
         z = [0., 0., 0.]
-        z[0] = 2 * L[0] * L[1]
-        z[1] = 2 * L[0] * L[2]
-        z[2] = 2 * L[0] * L[3]
+        z[0] = 2 * l[0] * l[1]
+        z[1] = 2 * l[0] * l[2]
+        z[2] = 2 * l[0] * l[3]
         return np.array(z)
 
     def filter(self, L_AS, w):
@@ -213,6 +224,7 @@ class UnscentedKalmanFilter:
                 w_cor: list[float] - угловая скорость коррекции
         """
         # прогноз
+        self.x_prev = self.x
         self.predict(w)
         # получение измерения
         z = self.get_measurements(L_AS)
@@ -220,5 +232,5 @@ class UnscentedKalmanFilter:
         self.update(z)
 
         # расчёт скорости рассогласования
-        w_cor = self.x / self.dt
+        w_cor = (self.x - self.x_prev) / self.dt
         return w_cor
