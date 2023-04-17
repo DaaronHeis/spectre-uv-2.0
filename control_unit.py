@@ -16,11 +16,11 @@ def from_euler_to_quat(angles, order):
         Принимает
         ---------
             angles: list[float] или NumPy array углов
-                gamma   (roll)
+                gamma
 
-                theta   (pitch)
+                theta
 
-                psi     (yaw)
+                psi
 
             order: строка, определяющая порядок углов в формате XYZr
 
@@ -159,11 +159,7 @@ def from_euler_to_quat(angles, order):
         q.x = np.sin(-b) * np.cos(a) * np.sin(g) - np.sin(-b) * np.sin(a) * np.cos(g)
         q.w = np.cos(-b) * np.cos(a) * np.cos(g) - np.cos(-b) * np.sin(a) * np.sin(g)
     else:
-        # print('{order} is not supported, choose another')
-        q.x = np.cos(g) * np.sin(b) * np.cos(a) + np.sin(g) * np.cos(b) * np.sin(a)
-        q.y = np.sin(g) * np.cos(b) * np.cos(a) - np.cos(g) * np.sin(b) * np.sin(a)
-        q.z = np.cos(g) * np.cos(b) * np.sin(a) - np.sin(g) * np.sin(b) * np.cos(a)
-        q.w = np.cos(g) * np.cos(b) * np.cos(a) + np.sin(g) * np.sin(b) * np.sin(a)
+        print('{order} is not supported, choose another')
     return q
 
 
@@ -264,7 +260,7 @@ class AstroSensor:
         Измеряет (или каким-то другим образом получает) независимую от полученной блоком управления ориентацию КА,
         по которой, используя фильтр Чебышева 1-го рода (2 пор.), получает угловую скорость астрокоррекции
     """
-    def __init__(self, L_meas, w_cor, UKF, ERROR_KEY: bool):
+    def __init__(self, L_meas, w_cor, KF, ERROR_KEY: bool):
 
         self.name = '348K'                              # имя астродатчика (из документации)
         self.L_meas = L_meas                            # текущий кватернион ориентации, измеренный астродатчиком
@@ -272,23 +268,12 @@ class AstroSensor:
         self.w_cor = w_cor                              # текущая рассчитанная угловая скорость астрокоррекции
         self.delta = 12.0 / 60/60/2/3.1415926           # погрешность измерения астродатчика
         self.key_noise = ERROR_KEY                      # ключ учёта погрешностей измерения
-        self.UKF = UKF
-        """
-            Используется фильтр Чебышева 1-го рода (2-го порядка) 
-            Передаточная функция фильтра:
-            
-                           0.6283 + 1.257(z^-1) + 0.6283(z^-2)
-                H(z^-1) = ------------------------------------
-                           1 + 1.18(z^-1) + 0.4816(z^-2)
-        """
-        self.k = 1                                    # коэффициент усиления
-        self.n = 2                                      # порядок фильтра
-        self.b = [0.6283, 1.257, 0.6283]                # коэффициенты b фильтра
-        self.a = [1, 1.18, 0.4816]                      # коэффициенты а фильтра
 
-        # в массиве хранятся 3 numpy array, на моменты времени t,t-1,t-2
-        self.fi_prev = []                               # предыдущие значения (0 - t-2, 1 - t-1)
-        self.w_cor_prev = []                            # углов расхождения и скорости коррекции
+        """
+            Используется линейный фильтр Калмана
+        """
+        self.KF = KF
+        self.k = 1                                     # коэффициент усиления
 
     def add_noise(self):
         """
@@ -309,17 +294,14 @@ class AstroSensor:
         if (self.key_noise is True) and (key_stab is False):
             self.add_noise()
 
-    '''
-    def filter(self):
+    def filter(self, w):
         """
             Моделирование работы фильтра
             Разностное уравнение, составленное из передаточной функции
         """
-        return(self.b[0] * fi + self.b[1] * self.fi_prev[1] + self.b[2] * self.fi_prev[0] - self.a[1] *
-                     self.w_cor_prev[1] - self.a[2] * self.w_cor_prev[0])
-    '''
+        return self.KF.filter(self.L_meas, w)
 
-    def set_correction(self, w):
+    def set_correction(self, L_from_CU, w):
         """
             Определяет текущую ориентацию аппарата и
             соответствующую угловую скорость астрокоррекции
@@ -332,20 +314,28 @@ class AstroSensor:
         """
 
         """ Вычисление угловой скорости астрокоррекции """
-        self.w_cor = self.UKF.filter(self.L_meas, w)
-        # for i in range(3):
-        #     if abs(self.w_cor[i]) >= 0.1:
-        #         self.w_cor[i] = 0.1
+        # определение кватерниона коррекции и углов расхождения
+        self.L_cor = self.L_meas.inverse() * L_from_CU
+        L_delta = qt.as_float_array(self.L_cor)
+        fi = [0, 0, 0]
+        fi[0] = 2 * L_delta[0] * L_delta[1]
+        fi[1] = 2 * L_delta[0] * L_delta[2]
+        fi[2] = 2 * L_delta[0] * L_delta[3]
+        fi = np.array(fi)
 
-    def get_correction(self, w_from_CU):
+        # получение угловой скорости астрокоррекции через фильтр
+        self.w_cor = self.filter(w)
+
+    def get_correction(self, L_from_CU, w):
         """
             Вычисляет угловую скорость астрокоррекции и возвращает её.
+            Вызывается из модуля СУ
         """
-        self.set_correction(w_from_CU)
-        return self.w_cor * self.k
+        self.set_correction(L_from_CU, w)
+        return self.w_cor
 
     def get_parameters(self):
-        params = [self.L_meas, self.L_cor, self.w_cor, self.UKF]
+        params = [self.L_meas, self.L_cor, self.w_cor, self.fi_prev]
         return params
 
 
@@ -436,7 +426,7 @@ class ControlUnit:
 
     def get_correction(self, astrosensor):
         """ Получение угловой скорости коррекции от астродатчика """
-        self.omega_cor = astrosensor.get_correction(self.omega)
+        self.omega_cor = astrosensor.get_correction(self.L_cur, self.omega_measured)
 
     def get_control_moment(self, t):
         """ Расчёт и получение управляющего момента """
