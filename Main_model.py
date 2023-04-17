@@ -9,6 +9,7 @@ import flywheel_engine as dm
 import control_unit as ctrl
 import updater as upd
 from dynamic_model_equations import runge_kutta
+from math import trunc, modf
 import unscented_kalman
 
 
@@ -80,10 +81,10 @@ def init_kalman(L_KA, L_pr, dt):
     x = np.array(x)
 
     # инициализация матриц ковариаций
-    P = np.diag([0.01, 0.01, 0.01])
-    Q = np.diag([0.0001, 0.0001, 0.0001])
-    delta = 12.0 / 60/60/3.1415926
-    R = np.diag([delta**2/3, delta**2/3, delta**2/3])
+    P = np.diag([0.1e-3, 0.1e-3, 0.1e-3])
+    Q = np.diag([0.1e-8, 0.1e-8, 0.1e-8])
+    delta = 12.0 / 3600 / 180*np.pi
+    R = np.eye(3) * (delta/3)**2
 
     # параметры генерации сигма-точек
     alpha = 0.0001
@@ -105,6 +106,15 @@ def init_handler(t, dt, L_KA, w_KA):
     """ Инициализация интерфейса - updater-a """
     handler = upd.Updater(0,dt,L_KA,w_KA)
     return handler
+
+
+def deg2sec(grad):
+    """ Перевод числа из десятичных градусов в угловые секунды """
+    m, g = modf(grad)
+    m = m * 60
+    s, m = modf(m)
+    s = s * 60
+    return [int(g), int(m), s]
 
 
 # TODO: полностью переписать, выбрав единую конвенцию для размерностей векторов
@@ -284,7 +294,7 @@ if __name__ == '__main__':
     # время интегрирования
     # TODO: написать нормальный интерфейс вместо постоянной правки кода
 
-    t_span_variant = 0
+    t_span_variant = 8
 
     if t_span_variant == 0:
         t_span = [0, 300]
@@ -366,17 +376,20 @@ if __name__ == '__main__':
     # включение LaTeX
     # plt.rcParams.update({"text.usetex":True})
 
-    a = results["Углы отклонения от заданной ориентации"]
-    a = a[len(a)-1]
-    print("------------------------------------------------")
-    print("        Ошибка ориентации по углам              ")
-    print("По углу крена: ", a[0] * 3600, "угл. мин.")
-    print("По углу тангажа: ", a[1] * 3600, "угл. мин.")
-    print("По углу рысканья: ", a[2] * 3600, "угл. мин.")
-    print("------------------------------------------------")
-
     print("Матрица ковариации фильтра Калмана")
     print(P)
+
+    a = results["Углы отклонения от заданной ориентации"]
+    a = a[len(a)-1]
+    roll = deg2sec(a[0])
+    pitch = deg2sec(a[1])
+    yaw = deg2sec(a[2])
+    print("------------------------------------------------")
+    print("        Ошибка ориентации по углам              ")
+    print("По углу крена: ", str(roll[0])+"град "+str(roll[1])+"' "+str(roll[2])+'"')
+    print("По углу тангажа: ", str(pitch[0])+"град "+str(pitch[1])+"' "+str(pitch[2])+'"')
+    print("По углу рысканья: ", str(yaw[0])+"град "+str(yaw[1])+"' "+str(yaw[2])+'"')
+    print("------------------------------------------------")
 
     i = 1
     for u in results.keys():
