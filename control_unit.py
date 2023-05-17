@@ -248,7 +248,7 @@ class GIVUS:
     def measure_velocity(self, w, t, dt):
         """ Измерение угловой скорости """
         w_meas = w.copy()
-        if self.key_noise > 0:
+        if self.key_noise is True:
             w_meas = self.add_angular_velocity_noise(w_meas, t, dt)
         
         return w_meas
@@ -266,7 +266,8 @@ class AstroSensor:
         self.L_meas = L_meas                            # текущий кватернион ориентации, измеренный астродатчиком
         self.L_cor = qt.quaternion(1,0,0,0)             # текущий кватернион коррекции
         self.w_cor = w_cor                              # текущая рассчитанная угловая скорость астрокоррекции
-        self.delta = 12.0 / 60/60/2/3.1415926           # погрешность измерения астродатчика
+        self.delta1 = 12.0 /60/60/2/3.1415926           # погрешность измерения астродатчика
+        self.delta2 = 1 /60/60/2/3.1415926              # погрешность измерения датчика гида
         self.key_noise = ERROR_KEY                      # ключ учёта погрешностей измерения
 
         """
@@ -275,7 +276,7 @@ class AstroSensor:
         self.KF = KF
         self.k = 1                                     # коэффициент усиления
 
-    def add_noise(self):
+    def add_noise(self, key_stab):
         """
             Добавление погрешностей измерения астродатчика
 
@@ -283,7 +284,17 @@ class AstroSensor:
             ------------
             L: quaternion - измеренный кватернион ориентации
         """
-        deltaL = qt.quaternion(1, random.choice([-1,1])*self.delta, random.choice([-1,1])*self.delta, random.choice([-1,1])*self.delta)
+        if key_stab:
+            deltaL = qt.quaternion(1,
+                                   random.choice([-1,1])*self.delta1,
+                                   random.choice([-1,1])*self.delta2,
+                                   random.choice([-1,1])*self.delta2)
+
+        else:
+            deltaL = qt.quaternion(1,
+                                   random.choice([-1,1])*self.delta1,
+                                   random.choice([-1,1])*self.delta1,
+                                   random.choice([-1,1])*self.delta1)
         self.L_meas = self.L_meas * deltaL
 
     def set_current_orientation(self, L, key_stab):
@@ -291,8 +302,8 @@ class AstroSensor:
             "Делает снимок неба", но на самом деле просто получает кватернион ориентации от handler-a 
         """
         self.L_meas = L.copy()
-        if (self.key_noise is True) and (key_stab is False):
-            self.add_noise()
+        if self.key_noise is True:
+            self.add_noise(key_stab)
 
     def filter(self, w):
         """
@@ -335,7 +346,7 @@ class AstroSensor:
         return self.w_cor
 
     def get_parameters(self):
-        params = [self.L_meas, self.L_cor, self.w_cor, self.fi_prev]
+        params = [self.L_meas, self.L_cor, self.w_cor]
         return params
 
 
@@ -348,7 +359,8 @@ class ControlUnit:
                        L_cur: qt.quaternion,
                        L_delta: qt.quaternion,
                        omega, gamma, omega_pr, w_bw, sigma_max,
-                     ASTRO_CORR_KEY: bool, ARTIF_ERR_KEY: bool):
+                       K1, K2,
+                       ASTRO_CORR_KEY: bool, ARTIF_ERR_KEY: bool):
         """
             Кватернионы ориентации отсчитываются от ЭСК-2. То есть, высчитывается положение
             начальной точки поворота, конечной точки в ЭСК-2, и затем рассчитывается по этим известным
@@ -386,15 +398,18 @@ class ControlUnit:
         """
 
         # коэффициенты управления для перенацеливания
-        # self.K1_pt = np.diag([0.0675, 0.0675, 0.0775]) * 0.6
-        # self.K2_pt = np.diag([4.85, 6.85, 6.55]) * 0.8
-        self.K1_pt = np.diag([0.03, 0.1175, 0.1175]) * 0.6
-        self.K2_pt = np.diag([1.35, 4.55, 4.85]) * 1.1
+        #self.K1_pt = np.diag([0.0675, 0.0675, 0.0775]) * 0.6
+        #self.K2_pt = np.diag([4.85, 6.85, 6.55]) * 0.9
+        #self.K1_pt = np.diag([0.03, 0.1175, 0.1175]) * 1.6
+        #self.K2_pt = np.diag([1.35, 4.55, 4.85]) * 1.1
 
         self.K1_st = np.diag([0.025, 0.04375, 0.05875]) * 1
         self.K2_st = np.diag([1.755, 3.375, 4.365]) * 1
 
-        self.threshold = 3 / 180 * np.pi                        # порог переключения
+        self.K1_pt = K1.copy()
+        self.K2_pt = K2.copy()
+
+        self.threshold = 0.0 / 180 * np.pi                      # порог переключения
 
         self.omega_measured = omega                             # текущее измерение угловой скорости ГИВУСом
         self.omega = omega                                      # текущий вектор угловой скорости (со всеми шумами и коррекциями)
@@ -486,8 +501,8 @@ class ControlUnit:
 
     def set_current_velocity(self, w):
         """ Запоминание текущей угловой скорости для интегрирования при вычислении ориентации """
-        self.omega_prev = self.omega
-        self.omega = w
+        self.omega_prev = self.omega.copy()
+        self.omega = w.copy()
 
     def add_error_in_orientation(self):
         """
@@ -509,3 +524,7 @@ class ControlUnit:
         """
         params = [self.L_cur, self.L_delta, self.gamma, self.omega]
         return params
+
+    def change_control_coefficients(self, K1, K2):
+        self.K1_pt = K1
+        self.K2_pt = K2

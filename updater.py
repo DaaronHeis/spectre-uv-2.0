@@ -47,17 +47,19 @@ class OutputData:
         self.results["Проекции вектора управляющего момента"] = []
         self.results["Кватернион рассогласования"] = []
         self.results["Кватернион текущей ориентации"] = []
+        self.results["Момент со стороны КУДМ"] = []
 
-        self.handles["Углы отклонения от заданной ориентации"] = ["град", "gamma", "theta", "psi"]
+        self.handles["Углы отклонения от заданной ориентации"] = ["град", "$\gamma$", "$\\theta$", "$\psi$"]
         self.handles["Угол отклонения оси х аппарата от оси х ИСК"] = ["град", "угол"]
-        self.handles["Проекции вектора угловой скорости"] = ["град/с","w_x", "w_y", "w_z"]
-        self.handles["Проекции измеренной угловой скорости"] = ["град/с","w_x", "w_y", "w_z"]
+        self.handles["Проекции вектора угловой скорости"] = ["град/с","$\omega_x$", "$\omega_y$", "$\omega_z$"]
+        self.handles["Проекции измеренной угловой скорости"] = ["град/с","$\omega_x$", "$\omega_y$", "$\omega_z$"]
         self.handles["Кинетические моменты каждого ДМ"] = ["Нм", "H_1", "H_2", "H_3", "H_4"]
         self.handles["Кинетические моменты в проекциях на оси ССК"] = ["Нм", "H_x", "H_y", "H_z"]
         self.handles["Скорости вращения ДМ"] = ["w_1", "w_2", "w_3", "w_4"]
-        self.handles["Проекции вектора управляющего момента"] = ["Нм", "sigma_x", "sigma_y", "sigma_z"]
-        self.handles["Кватернион рассогласования"] = ["","lambda_0", "lambda_1", "lambda_2", "lambda_3"]
-        self.handles["Кватернион текущей ориентации"] = ["","$/lambda$_0", "lambda_1", "lambda_2", "lambda_3"]
+        self.handles["Проекции вектора управляющего момента"] = ["Нм", "$\sigma_x$", "$\sigma_y$", "$\sigma_z$"]
+        self.handles["Кватернион рассогласования"] = ["","$\lambda_0$", "$\lambda_1$", "$\lambda_2$", "$\lambda_3$"]
+        self.handles["Кватернион текущей ориентации"] = ["","$\lambda_0$", "$\lambda_1$", "$\lambda_2$", "$\lambda_3$"]
+        self.handles["Момент со стороны КУДМ"] = ["M", "$M_x$", "$M_y$", "$M_z$"]
 
     def add_data(self, key, data):
         """
@@ -68,6 +70,8 @@ class OutputData:
         if key == "Кватернион рассогласования" or key == "Кватернион текущей ориентации":
             data = to_nparray(qt.as_float_array(data))
             data = data.reshape(4)
+        elif key == "Угол отклонения оси х аппарата от оси х ИСК":
+            data = float(data)
         elif data is list:
             data = to_nparray(data)
             data = np.array(data).reshape(len(data))
@@ -76,7 +80,7 @@ class OutputData:
         self.results[key].append(data)
 
 
-def run(initial_conditions):
+def run(initial_conditions, K1, K2):
     """
         initial_conditions:
             - t_span = [t0 t_end] - временной промежуток
@@ -113,9 +117,9 @@ def run(initial_conditions):
     dmAll_full = init_flywheels(n, w_bw, sigma_max)
 
     # инициализация БКУ
-    angles_ideal, w_ideal, ctrlUnit_ideal = init_control_unit(L_0, L_pr, w_0, w_pr, w_bw, sigma_max, 
+    angles_ideal, w_ideal, ctrlUnit_ideal = init_control_unit(L_0, L_pr, w_0, w_pr, w_bw, sigma_max, K1, K2,
                                                               CORR_KEY=False, ARTIF_ERR_KEY=False)
-    angles_full, w_full, ctrlUnit_full = init_control_unit(L_0, L_pr, w_0, w_pr, w_bw, sigma_max, 
+    angles_full, w_full, ctrlUnit_full = init_control_unit(L_0, L_pr, w_0, w_pr, w_bw, sigma_max, K1, K2,
                                                            CORR_KEY=True, ARTIF_ERR_KEY=False)
 
     # инициализация астродатчиков 
@@ -129,71 +133,6 @@ def run(initial_conditions):
     # инициализация структуры выходных данных
     data_ideal = OutputData()
     data_full = OutputData()
-
-    # -------------------------------------
-    # TODO: переписать в функцию
-    # получение текущей скорости КА
-    wMeas_ideal = givus_ideal.measure_velocity(w_ideal, t_curr, h)
-    wMeas_full = givus_full.measure_velocity(w_full, t_curr, h)
-    ctrlUnit_ideal.set_current_velocity(wMeas_ideal)
-    ctrlUnit_full.set_current_velocity(wMeas_full)
-
-    data_ideal.add_data("Проекции измеренной угловой скорости", wMeas_ideal)
-    data_full.add_data("Проекции измеренной угловой скорости", wMeas_full)
-
-    data_ideal.add_data("Проекции вектора угловой скорости", w_ideal)
-    data_full.add_data("Проекции вектора угловой скорости", w_full)
-
-    """
-        Измерение ориентации астродатчиком производится только для полной модели,
-        и представляет из себя кватернион ориентации. полученный идеальной моделью
-    """
-    # измерение текущей ориентации для идеальной модели
-    ctrlUnit_ideal.set_current_orientation(h, astrosensor_ideal)
-    L_KA = ctrlUnit_ideal.get_current_orientation()
-    data_ideal.add_data("Кватернион текущей ориентации", L_KA)
-    # передача полученного кватерниона как "снимка неба" астродатчику полной модели
-    astrosensor_full.set_current_orientation(L_KA, ctrlUnit_full.is_stabilisation())
-    ctrlUnit_full.set_current_orientation(h, astrosensor_full)
-    data_full.add_data("Кватернион текущей ориентации", ctrlUnit_full.get_current_orientation())
-
-    data_ideal.add_data("Углы отклонения от заданной ориентации", ctrlUnit_ideal.get_parameters()[2])
-    data_full.add_data("Углы отклонения от заданной ориентации", ctrlUnit_full.get_parameters()[2])
-
-    # формирование управляющих импульсов
-    sigma_ideal = ctrlUnit_ideal.get_control_moment(t_curr)
-    sigma_full = ctrlUnit_full.get_control_moment(t_curr)
-    data_ideal.add_data("Проекции вектора управляющего момента", sigma_ideal)
-    data_full.add_data("Проекции вектора управляющего момента", sigma_full)
-
-    # расчёт динамического момента КУДМ
-    Md_ideal = dm.update_block(sigma_ideal, dmAll_ideal)
-    Md_full = dm.update_block(sigma_full, dmAll_full)
-
-    # получение параметров КУДМ
-    dmParam_ideal = dm.get_all(dmAll_ideal)
-    dmParam_full = dm.get_all(dmAll_full)
-    Md_ideal = dmParam_ideal[0]
-    H_ideal = dmParam_ideal[1]
-    HH_ideal = dmParam_ideal[2]
-    w_dm_ideal = dmParam_ideal[3]
-    Md_full = dmParam_full[0]
-    H_full = dmParam_full[1]
-    HH_full = dmParam_full[2]
-    w_dm_full = dmParam_full[3]
-
-    # расчёт действующего момента
-    for j in range(3):
-        M_ideal[j] = M0[j] + Md_ideal[j]
-        M_full[j] = M0[j] + Md_full[j]
-
-    data_ideal.add_data("Кинетические моменты каждого ДМ", H_ideal)
-    data_full.add_data("Кинетические моменты каждого ДМ", H_full)
-    data_ideal.add_data("Кинетические моменты в проекциях на оси ССК", dm.from_dm_to_xyz(H_ideal))
-    data_full.add_data("Кинетические моменты в проекциях на оси ССК", dm.from_dm_to_xyz(H_full))
-    data_ideal.add_data("Скорости вращения ДМ", w_dm_ideal)
-    data_full.add_data("Скорости вращения ДМ", w_dm_full)
-    # ----------------------------------------------
 
     # инициализация начальных колебательных координат
     q_ideal = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -210,6 +149,8 @@ def run(initial_conditions):
         # получение текущей скорости КА
         wMeas_ideal = givus_ideal.measure_velocity(w_ideal, t_curr, h)
         wMeas_full = givus_full.measure_velocity(w_full, t_curr, h)
+
+        # установка текущей измеренной скорости в БКУ
         ctrlUnit_ideal.set_current_velocity(wMeas_ideal)
         ctrlUnit_full.set_current_velocity(wMeas_full)
 
@@ -223,14 +164,21 @@ def run(initial_conditions):
             Измерение ориентации астродатчиком производится только для полной модели,
             и представляет из себя кватернион ориентации. полученный идеальной моделью
         """
+
         # измерение текущей ориентации для идеальной модели
         ctrlUnit_ideal.set_current_orientation(h, astrosensor_ideal)
         L_KA = ctrlUnit_ideal.get_current_orientation()
+        angle = 2 * np.arccos(qt.as_float_array(L_KA)[0])
         data_ideal.add_data("Кватернион текущей ориентации", L_KA)
+        data_ideal.add_data("Угол отклонения оси х аппарата от оси х ИСК", angle)
+
         # передача полученного кватерниона как "снимка неба" астродатчику полной модели
         astrosensor_full.set_current_orientation(L_KA, ctrlUnit_full.is_stabilisation())
         ctrlUnit_full.set_current_orientation(h, astrosensor_full)
-        data_full.add_data("Кватернион текущей ориентации", ctrlUnit_full.get_current_orientation())
+        L_KA = ctrlUnit_full.get_current_orientation()
+        angle = 2 * np.arccos(qt.as_float_array(L_KA)[0])
+        data_full.add_data("Кватернион текущей ориентации", L_KA)
+        data_full.add_data("Угол отклонения оси х аппарата от оси х ИСК", angle)
 
         data_ideal.add_data("Углы отклонения от заданной ориентации", ctrlUnit_ideal.get_parameters()[2])
         data_full.add_data("Углы отклонения от заданной ориентации", ctrlUnit_full.get_parameters()[2])
@@ -241,6 +189,10 @@ def run(initial_conditions):
         data_ideal.add_data("Проекции вектора управляющего момента", sigma_ideal)
         data_full.add_data("Проекции вектора управляющего момента", sigma_full)
 
+        # кватернион рассогласования
+        data_ideal.add_data("Кватернион рассогласования", ctrlUnit_ideal.get_parameters()[1])
+        data_full.add_data("Кватернион рассогласования", ctrlUnit_full.get_parameters()[1])
+
         # расчёт динамического момента КУДМ
         Md_ideal = dm.update_block(sigma_ideal, dmAll_ideal)
         Md_full = dm.update_block(sigma_full, dmAll_full)
@@ -248,11 +200,9 @@ def run(initial_conditions):
         # получение параметров КУДМ
         dmParam_ideal = dm.get_all(dmAll_ideal) 
         dmParam_full = dm.get_all(dmAll_full)
-        Md_ideal = dmParam_ideal[0]
         H_ideal = dmParam_ideal[1]
         HH_ideal = dmParam_ideal[2]
         w_dm_ideal = dmParam_ideal[3]
-        Md_full = dmParam_full[0]
         H_full = dmParam_full[1]
         HH_full = dmParam_full[2]
         w_dm_full = dmParam_full[3]
@@ -264,17 +214,23 @@ def run(initial_conditions):
 
         data_ideal.add_data("Кинетические моменты каждого ДМ", H_ideal)
         data_full.add_data("Кинетические моменты каждого ДМ", H_full)
-        data_ideal.add_data("Кинетические моменты в проекциях на оси ССК", dm.from_dm_to_xyz(H_ideal))
-        data_full.add_data("Кинетические моменты в проекциях на оси ССК", dm.from_dm_to_xyz(H_full))
+        H_ideal = dm.from_dm_to_xyz(H_ideal)
+        HH_ideal = dm.from_dm_to_xyz(HH_ideal)
+        H_full = dm.from_dm_to_xyz(H_full)
+        HH_full = dm.from_dm_to_xyz(HH_full)
+        data_ideal.add_data("Кинетические моменты в проекциях на оси ССК", H_ideal)
+        data_full.add_data("Кинетические моменты в проекциях на оси ССК", H_full)
         data_ideal.add_data("Скорости вращения ДМ", w_dm_ideal)
         data_full.add_data("Скорости вращения ДМ", w_dm_full)
+        data_ideal.add_data("Момент со стороны КУДМ", Md_ideal)
+        data_full.add_data("Момент со стороны КУДМ", Md_full)
 
         # интегрирование уравнений
-        [w_ideal, q_ideal, dq_ideal] = runge_kutta(h, wMeas_ideal, q_ideal, dq_ideal, I, HH_ideal, H_ideal, M_ideal, gamma)
+        [w_ideal, q_ideal, dq_ideal] = runge_kutta(h, w_ideal, q_ideal, dq_ideal, I, HH_ideal, H_ideal, M_ideal, gamma)
         w_ideal = np.array(w_ideal).reshape(3)
         q_ideal = np.array(q_ideal).reshape(6)
         dq_ideal = np.array(dq_ideal).reshape(6)
-        [w_full, q_full, dq_full] = runge_kutta(h, wMeas_full, q_full, dq_full, I, HH_full, H_full, M_full, gamma)
+        [w_full, q_full, dq_full] = runge_kutta(h, w_full, q_full, dq_full, I, HH_full, H_full, M_full, gamma)
         w_full = np.array(w_full).reshape(3)
         q_full = np.array(q_full).reshape(6)
         dq_full = np.array(dq_full).reshape(6)

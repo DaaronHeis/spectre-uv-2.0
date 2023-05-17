@@ -14,7 +14,7 @@ def init_time(t_span, dt):
     t_begin = t_span[0]
     t_end = t_span[1]
     h = dt
-    t = [t_begin]
+    t = []
     t_curr = t_begin
     return t, t_curr, h, t_end
 
@@ -34,7 +34,7 @@ def init_target_orientation(angles_end, vel_end):
     # l_pr = l_k.inverse() * l_0
     # l_pr = qt.quaternion(1, 0, 0, 0)
     l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
-    print('l_pr = ', l_pr)
+    #print('l_pr = ', l_pr)
     return l_pr
 
 
@@ -42,20 +42,20 @@ def init_start_orientation(angles_0):
     """ Выставление начальной ориентации (сразу в виде кватерниона) """
     angles = angles_0.copy()
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
-    print('l_0 = ', l_0)
+    #print('l_0 = ', l_0)
     return l_0
 
 
-def init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max,
+def init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max, K1, K2,
                       CORR_KEY: bool, ARTIF_ERR_KEY: bool):
     """ Инициализация модуля блока управления """
     vel = vel_0.copy()
     l_cur = l_0.copy()
     l_delta = l_pr.inverse() * l_cur
-    print('l_delta = ', l_delta)
+    #print('l_delta = ', l_delta)
     angles = np.array([2 * l_delta.w * l_delta.x, 2 * l_delta.w * l_delta.y, 2 * l_delta.w * l_delta.z])
     ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
-                                 w_bw, sigma_max, CORR_KEY, ARTIF_ERR_KEY)
+                                 w_bw, sigma_max, K1, K2, CORR_KEY, ARTIF_ERR_KEY)
     return angles, vel, ctrl_unit
 
 
