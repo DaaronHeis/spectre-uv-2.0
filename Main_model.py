@@ -117,7 +117,6 @@ def deg2sec(grad):
     return [int(g), int(m), s]
 
 
-# TODO: полностью переписать, выбрав единую конвенцию для размерностей векторов
 def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
     """
         t_span: float[1x2] - начальный и конечный моменты времени
@@ -134,7 +133,6 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
     [t, t_curr, h, t_end] = init_time(t_span, dt)
 
     # инициализация моделей ДМ
-    # TODO: учесть ограничения на скорость из-за астродатчика (не более 0.2 град/с и 0.1 град/с^2 отн. ЭСК)
     sigma_max = 0.2
     w_bw = 5
     n = 4
@@ -191,38 +189,39 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
     angles_out = np.array(angles)
     vel_out = np.array(vel)
     w_dm_out = np.array([0.0, 0.0, 0.0, 0.0])
+    x_out = 2 * np.arccos(b[0])
 
     results = {}
     results["Углы отклонения от заданной ориентации"] = [angles_out]
+    results["Угол отклонения от оси х"] = [x_out]
     results["Проекции вектора угловой скорости на оси ССК"] = [vel_out]
     # results["Зашумленные проекции вектора угловой скорости на оси ССК"] = [vel_noise_out]
-    # results["Кинетические моменты каждого ДМ"] = [H_dm_out]
-    # results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
-    # results["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
-    # results["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
-    # results["Скорости вращения ДМ"] = [w_dm_out]
+    #results["Кинетические моменты каждого ДМ"] = [H_dm_out]
+    #results["Кинетические моменты в проекциях на оси ССК"] = [H_xyz_out]
+    #results["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
+    #results["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    #results["Скорости вращения ДМ"] = [w_dm_out]
     results["Проекции вектора управляющего момента на оси ССК"] = [sigma_out]
-    # results["Кватернион рассогласования"] = [l_delta_out]
-    # results["Кватернион текущей ориентации"] = [l_cur_out]
+    results["Кватернион рассогласования"] = [l_delta_out]
+    results["Кватернион текущей ориентации"] = [l_cur_out]
     results["Угловая скорость коррекции"] = [np.array([0., 0., 0.])]
 
     handles = {}
-    handles["Углы отклонения от заданной ориентации"] = ["град", "gamma", "theta", "psi"]
-    handles["Проекции вектора угловой скорости на оси ССК"] = ["град/с","w_x", "w_y", "w_z"]
+    handles["Углы отклонения от заданной ориентации"] = ["град", r'$\gamma$', r'$\vartheta$', r'$\psi$']
+    handles["Проекции вектора угловой скорости на оси ССК"] = ["град/с", r'$\omega_x$', r'$\omega_y$', r'$\omega_z$']
+    handles["Угол отклонения от оси х"] = ["град", "угол"]
     # handles["Зашумленные проекции вектора угловой скорости на оси ССК"] = ["град/с","w_x", "w,y", "w_z"]
-    # handles["Кинетические моменты каждого ДМ"] = ["Нм", "H_1", "H_2", "H_3", "H_4"]
-    # handles["Кинетические моменты в проекциях на оси ССК"] = ["Нм", "H_x", "H_y", "H_z"]
-    # handles["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
-    # handles["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
-    # handles["Скорости вращения ДМ"] = ["w_1", "w_2", "w_3", "w_4"]
-    handles["Проекции вектора управляющего момента на оси ССК"] = ["Нм", "sigma_x", "sigma_y", "sigma_z"]
-    # handles["Кватернион рассогласования"] = ["","lambda_0", "lambda_1", "lambda_2", "lambda_3"]
-    # handles["Кватернион текущей ориентации"] = ["","lambda_0", "lambda_1", "lambda_2", "lambda_3"]
-    handles["Угловая скорость коррекции"] = ["град/с", "w_x", "w_y", "w_z"]
+    #handles["Кинетические моменты каждого ДМ"] = ["Нм", "H_1", "H_2", "H_3", "H_4"]
+    #handles["Кинетические моменты в проекциях на оси ССК"] = ["Нм", "H_x", "H_y", "H_z"]
+    #handles["Скорость изменения кин. момента каждого ДМ"] = [HH_dm_out]
+    #handles["Скорость изменения кин. момента в проекциях на оси ССК"] = [HH_xyz_out]
+    #handles["Скорости вращения ДМ"] = ["w_1", "w_2", "w_3", "w_4"]
+    handles["Проекции вектора управляющего момента на оси ССК"] = ["Нм", r'$\sigma_x$', r'$\sigma_y$', r'$\sigma_z$']
+    handles["Кватернион рассогласования"] = ["",r'$\lambda_0$', r'$\lambda_1$', r'$\lambda_2$', r'$\lambda_3$']
+    handles["Кватернион текущей ориентации"] = ["",r'$\lambda_0$', r'$\lambda_1$', r'$\lambda_2$', r'$\lambda_3$']
+    handles["Угловая скорость коррекции"] = ["град/с", r'$\omega^{кор}_x$', r'$\omega^{кор}_y$', r'$\omega^{кор}_z$']
 
     # интегрирование
-    # TODO: переписать модульно, с учетом добавления новых модулей в будущем
-
     while t_curr <= t_end:
 
         t.append(t_curr)
@@ -238,6 +237,7 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
         b = qt.as_float_array(ctrl_unit_params[1])
         l_delta = np.array([b[0], b[1], b[2], b[3]])
         angles = ctrl_unit_params[2].copy()
+        x_out = 2 * np.arccos(b[0])
 
         w_cor = params[2][2].copy()
         P = params[2][3].P
@@ -271,13 +271,14 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
 
         results["Углы отклонения от заданной ориентации"].append(angles)
         results["Проекции вектора угловой скорости на оси ССК"].append(vel)
+        results["Угол отклонения от оси х"].append(x_out)
         # results["Зашумленные проекции вектора угловой скорости на оси ССК"].append(vel_noise)
-        # results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
-        # results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz.reshape(3))
-        # results["Скорости вращения ДМ"].append(np.array(w_self_dm))
+        #results["Кинетические моменты каждого ДМ"].append(np.array(H_dm))
+        #results["Кинетические моменты в проекциях на оси ССК"].append(H_xyz.reshape(3))
+        #results["Скорости вращения ДМ"].append(np.array(w_self_dm))
         results["Проекции вектора управляющего момента на оси ССК"].append(np.array(sigma).reshape(3))
-        # results["Кватернион рассогласования"].append(l_delta)
-        # results["Кватернион текущей ориентации"].append(l_cur)
+        results["Кватернион рассогласования"].append(l_delta)
+        results["Кватернион текущей ориентации"].append(l_cur)
         results["Угловая скорость коррекции"].append(np.array(w_cor).reshape(3))
 
         k += 1
@@ -294,7 +295,7 @@ if __name__ == '__main__':
     # время интегрирования
     # TODO: написать нормальный интерфейс вместо постоянной правки кода
 
-    t_span_variant = 8
+    t_span_variant = 2
 
     if t_span_variant == 0:
         t_span = [0, 300]
@@ -354,9 +355,9 @@ if __name__ == '__main__':
         Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
     [t, results, handles, P] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
-                                CORR_KEY=True,
-                                A_S_ERR_KEY=True,
-                                GIVUS_ERR_KEY=True,
+                                CORR_KEY=False,
+                                A_S_ERR_KEY=False,
+                                GIVUS_ERR_KEY=False,
                                 ARTIF_ERR_KEY=False)
 
     # отображение графиков
@@ -364,6 +365,8 @@ if __name__ == '__main__':
     # tmp = [vector/k for vector in results["angles"]]
     results["Углы отклонения от заданной ориентации"] = \
         [vector/k for vector in results["Углы отклонения от заданной ориентации"]]
+    results["Угол отклонения от оси х"] = \
+        [vector/k for vector in results["Угол отклонения от оси х"]]
     results["Проекции вектора угловой скорости на оси ССК"] = \
         [vector/k for vector in results["Проекции вектора угловой скорости на оси ССК"]]
     """ results["Зашумленные проекции вектора угловой скорости на оси ССК"] = \
@@ -372,9 +375,6 @@ if __name__ == '__main__':
         [vector / k for vector in results["Угловая скорость коррекции"]]
 
     # с этого момента все углы в градусах
-
-    # включение LaTeX
-    # plt.rcParams.update({"text.usetex":True})
 
     print("Матрица ковариации фильтра Калмана")
     print(P)
@@ -386,9 +386,16 @@ if __name__ == '__main__':
     yaw = deg2sec(a[2])
     print("------------------------------------------------")
     print("        Ошибка ориентации по углам              ")
-    print("По углу крена: ", str(roll[0])+"град "+str(roll[1])+"' "+str(roll[2])+'"')
-    print("По углу тангажа: ", str(pitch[0])+"град "+str(pitch[1])+"' "+str(pitch[2])+'"')
-    print("По углу рысканья: ", str(yaw[0])+"град "+str(yaw[1])+"' "+str(yaw[2])+'"')
+    print("По углу крена: ", str(roll[0])+" град "+str(roll[1])+"' "+str(roll[2])+'"')
+    print("По углу тангажа: ", str(pitch[0])+" град "+str(pitch[1])+"' "+str(pitch[2])+'"')
+    print("По углу рысканья: ", str(yaw[0])+" град "+str(yaw[1])+"' "+str(yaw[2])+'"')
+    print("------------------------------------------------")
+
+    a = results["Угол отклонения от оси х"]
+    angle = a[len(a)-1]
+    angle = deg2sec(angle)
+    print("    Ошибка ориентации по углу отклонения        ")
+    print(str(angle[0])+" град "+str(angle[1])+"' "+str(angle[2])+'"')
     print("------------------------------------------------")
 
     i = 1

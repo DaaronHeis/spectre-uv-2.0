@@ -332,10 +332,11 @@ class AstroSensor:
         """
 
         """ Вычисление угловой скорости астрокоррекции """
-        self.w_cor = self.UKF.filter(self.L_meas, w)
-        # for i in range(3):
-        #     if abs(self.w_cor[i]) >= 0.1:
-        #         self.w_cor[i] = 0
+        k = 0.2 / 180 * np.pi           # порог выключения астродатчика
+        #if abs(w[0]) > k or abs(w[1]) > k or abs(w[2]) > k:
+        #    self.w_cor = np.zeros_like(w)
+        #else:
+        self.w_cor = self.UKF.filter(self.L_meas, w) - w
 
     def get_correction(self, w_from_CU):
         """
@@ -401,8 +402,8 @@ class ControlUnit:
         self.K1_pt = np.diag([0.025, 0.1275, 0.08175]) * 0.6
         self.K2_pt = np.diag([1.35, 4.55, 4.75]) * 1.1
 
-        self.K1_st = np.diag([0.025, 0.05375, 0.06875]) * 1
-        self.K2_st = np.diag([1.755, 4.175, 4.165]) * 1
+        self.K1_st = np.diag([0.025, 0.05375, 0.05875]) * 1
+        self.K2_st = np.diag([1.755, 4.175, 4.665]) * 1
 
         self.threshold = 3 / 180 * pi                           # порог переключения
         self.corr_threshold = 0.2 / 180 * pi                    # порог выключения астродатчика
