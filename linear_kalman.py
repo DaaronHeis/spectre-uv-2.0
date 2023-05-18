@@ -52,6 +52,7 @@ class UnscentedKalmanFilter:
         self.n = x.shape[0]     # размерность вектора состояния
         self.dt = dt            # такт работы системы
         self.L_pr = L_pr        # кватернион программмной ориентации
+        self.k = 1
 
         self.F = np.eye(3)          # матрица F процесса
         self.H = np.eye(3)          # матрица H измерений
@@ -151,44 +152,12 @@ class UnscentedKalmanFilter:
 
             Обновляет предсказанные состояние и ковариацию
         """
-        """
-        mu = self.x
-        sigmas, self.Wm, self.Wc = self.compute_sigma_points(mu)
-        for i in range(self.num_sigmas):
-            self.sigmas_f[i] = self.fx(sigmas[i], u)
-        self.x_predicted, self.P_predicted = self.unscented_transform(self.sigmas_f, self.Wm, self.Wc)
-        """
-
         self.x_predicted = self.F @ self.x + self.B @ u
         self.P_predicted = self.F @ self.P @ self.F.T + self.Q
 
     def update(self, z):
         """
             Коррекция
-        """
-        """
-        sigmas_f = self.sigmas_f
-        sigmas_h = self.sigmas_h
-
-        # преобразование сигма-точек в пространство измерений
-        for i in range(self.num_sigmas):
-            sigmas_h[i] = self.hx(sigmas_f[i])
-
-        # преобразование предсказанных среднего и ковариации
-        z_predicted, Pz = self.unscented_transform(sigmas_h, self.Wm, self.Wc)
-
-        # вычисление перекрёстных ковариаций состояния и измерения
-        dim_x = self.x.shape[0]
-        dim_z = z_predicted.shape[0]
-        Pxz = np.zeros((dim_x, dim_z))
-        for i in range(self.num_sigmas):
-            Pxz += self.Wc[i] * np.outer(sigmas_f[i] - self.x_predicted, sigmas_h[i] - z_predicted)
-
-        # калмановское усиление
-        K = np.dot(Pxz, np.linalg.inv(Pz))
-        y = z - z_predicted
-        self.x = self.x_predicted + K @ y
-        self.P = self.P_predicted - K @ Pz @ K.T
         """
         y = z - self.H @ self.x_predicted
         S = self.H @ self.P_predicted @ self.H.T + self.R
@@ -197,11 +166,11 @@ class UnscentedKalmanFilter:
         self.x = self.x_predicted + K @ y
         self.P = (np.eye(3) - K @ self.H) @ self.P_predicted
 
-    def get_measurements(self, L):
+    def get_measurements(self, L, L_CU):
         """
             Метод, преобразовывающий полученный от астродатчика кватернион рассогласования в пространство состояния
         """
-        l = self.L_pr.inverse() * L
+        l = L.inverse() * L_CU
         l = qt.as_float_array(l)
         z = [0., 0., 0.]
         z[0] = 2 * l[0] * l[1]
@@ -209,7 +178,7 @@ class UnscentedKalmanFilter:
         z[2] = 2 * l[0] * l[3]
         return np.array(z)
 
-    def filter(self, L_AS, w):
+    def filter(self, L_AS, L_CU, w):
         """
             Метод, реализующий одну итерацию алгоритма фильтра
 
@@ -227,10 +196,13 @@ class UnscentedKalmanFilter:
         self.x_prev = self.x
         self.predict(w)
         # получение измерения
-        z = self.get_measurements(L_AS)
+        z = self.get_measurements(L_AS, L_CU)
         # коррекция
         self.update(z)
 
         # расчёт скорости рассогласования
         w_cor = (self.x - self.x_prev) / self.dt
-        return w_cor
+        return -w_cor * self.k
+
+    def change_R(self, R):
+        self.R = R

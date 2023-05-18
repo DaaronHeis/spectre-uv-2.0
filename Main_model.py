@@ -9,8 +9,8 @@ import flywheel_engine as dm
 import control_unit as ctrl
 import updater as upd
 from dynamic_model_equations import runge_kutta
-from math import trunc, modf
-import unscented_kalman
+from math import modf
+import linear_kalman
 
 
 def init_time(t_span, dt):
@@ -73,7 +73,7 @@ def init_GIVUS(GIVUS_ERR_KEY: bool):
 def init_kalman(L_KA, L_pr, dt):
     """ Инициализация фильтра Калмана """
     # инициализация начального состояния
-    l_delta = qt.as_float_array(L_pr.inverse() * L_KA)
+    l_delta = qt.as_float_array(L_KA.inverse() * L_KA)
     x = [0., 0., 0.]
     x[0] = 2 * l_delta[0] * l_delta[1]
     x[1] = 2 * l_delta[0] * l_delta[2]
@@ -81,17 +81,16 @@ def init_kalman(L_KA, L_pr, dt):
     x = np.array(x)
 
     # инициализация матриц ковариаций
-    P = np.diag([0.1e-3, 0.1e-3, 0.1e-3])
-    Q = np.diag([0.1e-8, 0.1e-8, 0.1e-8])
-    delta = 12.0 / 3600 / 180*np.pi
-    R = np.eye(3) * (delta/3)**2
+    P = np.diag([0.1e-11, 0.1e-11, 0.1e-11])
+    Q = np.diag([0.1e-5, 0.1e-5, 0.1e-5])
+    R = np.eye(3)
 
     # параметры генерации сигма-точек
     alpha = 0.0001
     beta = 2
     kappa = 0
 
-    UKF = unscented_kalman.UnscentedKalmanFilter(x, P, Q, R, dt, L_pr, alpha, beta, kappa)
+    UKF = linear_kalman.UnscentedKalmanFilter(x, P, Q, R, dt, L_pr, alpha, beta, kappa)
     return UKF
 
 
@@ -355,10 +354,10 @@ if __name__ == '__main__':
         Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
     [t, results, handles, P] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
-                                CORR_KEY=True,
+                                CORR_KEY=False,
                                 A_S_ERR_KEY=True,
                                 GIVUS_ERR_KEY=True,
-                                ARTIF_ERR_KEY=False)
+                                ARTIF_ERR_KEY=True)
 
     # отображение графиков
     n = len(t)

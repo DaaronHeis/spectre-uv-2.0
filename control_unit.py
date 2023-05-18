@@ -261,19 +261,20 @@ class GIVUS:
 class AstroSensor:
     """
         Матмодель астродатчика
-        Измеряет (или каким-то другим образом получает) независимую от полученной блоком управления ориентацию КА,
-        по которой, используя фильтр Чебышева 1-го рода (2 пор.), получает угловую скорость астрокоррекции
     """
     def __init__(self, L_meas, w_cor, UKF, ERROR_KEY: bool):
 
         self.name = '348K'                              # имя астродатчика (из документации)
         self.L_meas = L_meas                            # текущий кватернион ориентации, измеренный астродатчиком
-        self.L_cor = qt.quaternion(1,0,0,0)             # текущий кватернион коррекции
+        self.L_cor = qt.quaternion(1,0,0,0)
         self.w_cor = w_cor                              # текущая рассчитанная угловая скорость астрокоррекции
         self.delta1 = 12.0 / 3600 / 180*pi              # погрешность измерения астродатчика
         self.delta2 = 0.01 / 3600 / 180*pi              # погрешность измерения датчика гида
         self.key_noise = ERROR_KEY                      # ключ учёта погрешностей измерения
         self.UKF = UKF
+        self.t = 0
+        self.R1 = np.eye(3) * (self.delta1/3)**2
+        self.R2 = np.diag([(self.delta1/3)**2, (self.delta2/3)**2, (self.delta2/3)**2])
         """
             Используется фильтр Чебышева 1-го рода (2-го порядка) 
             Передаточная функция фильтра:
@@ -282,10 +283,6 @@ class AstroSensor:
                 H(z^-1) = ------------------------------------
                            1 + 1.18(z^-1) + 0.4816(z^-2)
         """
-
-        # в массиве хранятся 3 numpy array, на моменты времени t,t-1,t-2
-        self.fi_prev = []                               # предыдущие значения (0 - t-2, 1 - t-1)
-        self.w_cor_prev = []                            # углов расхождения и скорости коррекции
 
     def add_noise(self, key_stab):
         """
@@ -298,20 +295,24 @@ class AstroSensor:
         if key_stab:
             deltaL = qt.quaternion(1, random.choice([-1, 1]) * self.delta1, random.choice([-1, 1]) * self.delta2,
                                    random.choice([-1, 1]) * self.delta2)
+            self.UKF.change_R(self.R2)
         else:
             deltaL = qt.quaternion(1, random.choice([-1, 1]) * self.delta1, random.choice([-1, 1]) * self.delta1,
                                    random.choice([-1, 1]) * self.delta1)
+            self.UKF.change_R(self.R1)
+        deltaL = deltaL.normalized()
         self.L_meas = self.L_meas * deltaL
 
-    def set_current_orientation(self, L, key_stab):
+    def set_current_orientation(self, L, key_stab, t):
         """
             "Делает снимок неба", но на самом деле просто получает кватернион ориентации от handler-a 
         """
         self.L_meas = L.copy()
         if self.key_noise is True:
             self.add_noise(key_stab)
+        self.t = t
 
-    def set_correction(self, w):
+    def set_correction(self, L_CU, w):
         """
             Определяет текущую ориентацию аппарата и
             соответствующую угловую скорость астрокоррекции
@@ -324,18 +325,17 @@ class AstroSensor:
         """
 
         """ Вычисление угловой скорости астрокоррекции """
-        self.w_cor = self.UKF.filter(self.L_meas, w) - w
+        self.w_cor = self.UKF.filter(self.L_meas, L_CU, w)
 
-    def get_correction(self, w_from_CU):
+    def get_correction(self, L_CU, w_CU):
         """
             Вычисляет угловую скорость астрокоррекции и возвращает её.
         """
-        self.set_correction(w_from_CU)
+        self.set_correction(L_CU, w_CU)
         k = 0.2 / 180 * np.pi  # порог выключения астродатчика
-        if any(w_from_CU > k):
-            return 0
-        else:
-            return self.w_cor
+        if any(w_CU > k) or self.t < 1:
+            self.w_cor = np.zeros_like(w_CU)
+        return self.w_cor
 
     def get_parameters(self):
         params = [self.L_meas, self.L_cor, self.w_cor, self.UKF]
@@ -391,13 +391,13 @@ class ControlUnit:
         # коэффициенты управления для перенацеливания
         # self.K1_pt = np.diag([0.0675, 0.0675, 0.0775]) * 0.6
         # self.K2_pt = np.diag([4.85, 6.85, 6.55]) * 0.8
-        self.K1_pt = np.diag([0.025, 0.1275, 0.08175]) * 0.6
+        self.K1_pt = np.diag([0.025, 0.1275, 0.10175]) * 0.6
         self.K2_pt = np.diag([1.35, 4.55, 4.75]) * 1.1
 
         self.K1_st = np.diag([0.025, 0.05375, 0.05875]) * 1
         self.K2_st = np.diag([1.755, 4.175, 4.665]) * 1
 
-        self.threshold = 4 / 180 * pi                           # порог переключения
+        self.threshold = 5 / 180 * pi                           # порог переключения
 
         self.omega_measured = omega                             # текущее измерение угловой скорости ГИВУСом
         self.omega = omega                                      # текущий вектор угловой скорости (со всеми шумами и коррекциями)
@@ -429,7 +429,7 @@ class ControlUnit:
 
     def get_correction(self, astrosensor):
         """ Получение угловой скорости коррекции от астродатчика """
-        self.omega_cor = astrosensor.get_correction(self.omega)
+        self.omega_cor = astrosensor.get_correction(self.L_cur, self.omega)
 
     def get_control_moment(self, t):
         """ Расчёт и получение управляющего момента """
@@ -497,9 +497,9 @@ class ControlUnit:
         Добавление искусственной ошибки при определении ориентации КА. Использовать для
         проверки работы астрокоррекции
         """
-        k = 0.00001
-        #error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
-        error_quat = qt.quaternion(1, k, k, k)
+        k = 0.0005
+        error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
+        #error_quat = qt.quaternion(1, k, -k, k)
         error_quat = error_quat.normalized()
         self.L_cur = self.L_cur*error_quat
 

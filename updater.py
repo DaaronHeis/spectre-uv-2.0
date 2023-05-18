@@ -42,17 +42,15 @@ class Updater:
         w_meas = Gyro.measure_velocity(self.w_KA, self.t, self.dt)
         CU.set_current_velocity(w_meas)
 
-        Astro.set_current_orientation(self.L_KA, CU.is_stabilisation())
+        Astro.set_current_orientation(self.L_KA, CU.is_stabilisation(), self.t)
 
         # интегрирование уравнения кинематики и астрокоррекция
-        #                   !!!ВАЖНО!!!
-        # TODO: попробовать сначала проинтегрировать, а потом проинтегрировать ещё раз с коррекцией
         CU.set_current_orientation(self.dt, Astro)
         sigma = CU.get_control_moment(self.t)
 
         # получение параметров модулей и их вывод
         CU_params = CU.get_parameters()
         Astro_params = Astro.get_parameters()
-        params = [sigma, CU_params, Astro_params]
+        params = [sigma, CU_params, Astro_params, self.w_KA]
 
         return params  
