@@ -350,7 +350,7 @@ class ControlUnit:
     def __init__(self, L_pr: qt.quaternion,
                        L_cur: qt.quaternion,
                        L_delta: qt.quaternion,
-                       omega, gamma, omega_pr, w_bw, sigma_max,
+                       omega, gamma, omega_pr, w_bw, sigma_max, k,
                      ASTRO_CORR_KEY: bool, ARTIF_ERR_KEY: bool):
         """
             Кватернионы ориентации отсчитываются от ЭСК-2. То есть, высчитывается положение
@@ -391,11 +391,11 @@ class ControlUnit:
         # коэффициенты управления для перенацеливания
         # self.K1_pt = np.diag([0.0675, 0.0675, 0.0775]) * 0.6
         # self.K2_pt = np.diag([4.85, 6.85, 6.55]) * 0.8
-        self.K1_pt = np.diag([0.025, 0.1275, 0.10175]) * 0.6
-        self.K2_pt = np.diag([1.35, 4.55, 4.75]) * 1.1
+        self.K1_pt = np.diag([0.035, 0.1075, 0.12175]) * 1.7
+        self.K2_pt = np.diag([1.35, 4.55, 4.75]) * 2.1
 
-        self.K1_st = np.diag([0.025, 0.05375, 0.05875]) * 1
-        self.K2_st = np.diag([1.755, 4.175, 4.665]) * 1
+        self.K1_st = np.diag([0.02, 0.055, 0.0558]) * 1.5
+        self.K2_st = np.diag([1.655, 4.175, 4.665]) * 1.25
 
         self.threshold = 5 / 180 * pi                           # порог переключения
 
@@ -414,6 +414,8 @@ class ControlUnit:
         self.flag = False                                       # флаг перехода в режим стабилизации
         self.key_corr = ASTRO_CORR_KEY                          # ключ, подключающий астрокоррекцию
         self.key_orient_error = ARTIF_ERR_KEY                   # ключ, подключающий искусственную ощибку ориентации
+
+        self.k = k
 
     def set_gamma(self):
         """ Определение вектора углового положения КА """
@@ -497,7 +499,7 @@ class ControlUnit:
         Добавление искусственной ошибки при определении ориентации КА. Использовать для
         проверки работы астрокоррекции
         """
-        k = 0.0005
+        k = self.k
         error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
         #error_quat = qt.quaternion(1, k, -k, k)
         error_quat = error_quat.normalized()

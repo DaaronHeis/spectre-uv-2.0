@@ -37,7 +37,7 @@ def init_target_orientation(angles_end, vel_end):
     gamma_pr = angles_end.copy()
     l_k = ctrl.from_euler_to_quat(gamma_pr, 'YZXr')
     # l_pr = l_k.inverse() * l_0
-    # l_pr = qt.quaternion(1, 0, 0, 0)
+    #l_pr = qt.quaternion(1, 0, 0, 0)
     l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
     print('l_pr = ', l_pr)
     return l_pr, omega_pr
@@ -47,6 +47,8 @@ def init_start_orientation(angles_0):
     """ Выставление начальной ориентации (сразу в виде кватерниона) """
     angles = angles_0.copy()
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
+    l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
+    l_0 = l_pr.inverse()
     print('l_0 = ', l_0)
     return l_0
 
@@ -116,7 +118,7 @@ def deg2sec(grad):
     return [int(g), int(m), s]
 
 
-def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
+def run(k, t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_ERR_KEY, GIVUS_ERR_KEY, ARTIF_ERR_KEY):
     """
         t_span: float[1x2] - начальный и конечный моменты времени
         dt: float
@@ -146,7 +148,7 @@ def run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M0, I, CORR_KEY, A_S_E
         Инициализация модуля управления здесь
         -------------------------------------
     """
-    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max,
+    [angles, vel, ctrl_unit] = init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max, k,
                                                  CORR_KEY, ARTIF_ERR_KEY)
     q = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     dq = q.copy()
@@ -294,7 +296,7 @@ if __name__ == '__main__':
     # время интегрирования
     # TODO: написать нормальный интерфейс вместо постоянной правки кода
 
-    t_span_variant = 10
+    t_span_variant = 20
 
     if t_span_variant == 0:
         t_span = [0, 300]
@@ -348,17 +350,44 @@ if __name__ == '__main__':
     # тензор инерции (данные из документации, не менять)
     I = np.array([[3379.4, 25.6, 3.2], [25.6, 9283.9, 19.6], [3.2, 19.6, 10578.5]])
 
-    """
-            !!!ВАЖНО!!!
-        Выходные углы - это углы, которые получаются из текущего кватерниона ориентации
-        Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
-    """
-    [t, results, handles, P] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
+    coef = 0.0001
+    acc_with_correction = []
+    acc_without_correction = []
+    for i in range(1, 11):
+        K = coef * i
+        for j in range(100):
+            [t, results, handles, P] = run(K, t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
                                 CORR_KEY=False,
                                 A_S_ERR_KEY=True,
                                 GIVUS_ERR_KEY=True,
                                 ARTIF_ERR_KEY=True)
+            n = len(t)
+            results["Углы отклонения от заданной ориентации"] = \
+                [vector / k for vector in results["Углы отклонения от заданной ориентации"]]
+            a = results["Углы отклонения от заданной ориентации"]
+            a = a[len(a) - 1]
+            acc_without_correction[i] += a
 
+            [t, results, handles, P] = run(K, t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
+                                           CORR_KEY=True,
+                                           A_S_ERR_KEY=True,
+                                           GIVUS_ERR_KEY=True,
+                                           ARTIF_ERR_KEY=True)
+            n = len(t)
+            results["Углы отклонения от заданной ориентации"] = \
+                [vector / k for vector in results["Углы отклонения от заданной ориентации"]]
+            a = results["Углы отклонения от заданной ориентации"]
+            a = a[len(a) - 1]
+            acc_with_correction[i] += a
+        acc_without_correction[i] /= 100
+        acc_with_correction[i] /= 100
+
+    error_coef = [coef * i for i in range(1, 11)]
+    fig = plt.figure(1)
+    plt.plot(error_coef, acc_without_correction, acc_with_correction)
+
+
+    '''
     # отображение графиков
     n = len(t)
     # tmp = [vector/k for vector in results["angles"]]
@@ -415,3 +444,4 @@ if __name__ == '__main__':
         plt.grid(True)
         i += 1
     plt.show()
+    '''
