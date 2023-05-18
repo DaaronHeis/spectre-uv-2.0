@@ -295,7 +295,7 @@ if __name__ == '__main__':
     # время интегрирования
     # TODO: написать нормальный интерфейс вместо постоянной правки кода
 
-    t_span_variant = 2
+    t_span_variant = 10
 
     if t_span_variant == 0:
         t_span = [0, 300]
@@ -355,9 +355,9 @@ if __name__ == '__main__':
         Они (по идее) отображают углы, на которые осталось повернуться, чтобы прийти к итоговой ориентации
     """
     [t, results, handles, P] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
-                                CORR_KEY=False,
-                                A_S_ERR_KEY=False,
-                                GIVUS_ERR_KEY=False,
+                                CORR_KEY=True,
+                                A_S_ERR_KEY=True,
+                                GIVUS_ERR_KEY=True,
                                 ARTIF_ERR_KEY=False)
 
     # отображение графиков
@@ -409,7 +409,8 @@ if __name__ == '__main__':
             labels.append(b[j+1])
         plt.plot(t, a, label=labels)
         plt.title(u)
-        plt.legend()
+        if u != "Угол отклонения от оси х":
+            plt.legend()
         plt.xlabel("Время, с")
         plt.ylabel(b[0])
         plt.grid(True)
