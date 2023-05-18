@@ -39,7 +39,7 @@ def init_target_orientation(angles_end, vel_end):
     # l_pr = l_k.inverse() * l_0
     #l_pr = qt.quaternion(1, 0, 0, 0)
     l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
-    print('l_pr = ', l_pr)
+    #print('l_pr = ', l_pr)
     return l_pr, omega_pr
 
 
@@ -49,20 +49,20 @@ def init_start_orientation(angles_0):
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
     l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
     l_0 = l_pr.inverse()
-    print('l_0 = ', l_0)
+    #print('l_0 = ', l_0)
     return l_0
 
 
-def init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max,
+def init_control_unit(l_0, l_pr, vel_0, omega_pr, w_bw, sigma_max, k,
                       CORR_KEY: bool, ARTIF_ERR_KEY: bool):
     """ Инициализация модуля блока управления """
     vel = vel_0.copy()
     l_cur = l_0.copy()
     l_delta = l_pr.inverse() * l_cur
-    print('l_delta = ', l_delta)
+    #print('l_delta = ', l_delta)
     angles = np.array([2 * l_delta.w * l_delta.x, 2 * l_delta.w * l_delta.y, 2 * l_delta.w * l_delta.z])
     ctrl_unit = ctrl.ControlUnit(l_pr, l_cur, l_delta, vel, angles, omega_pr,
-                                 w_bw, sigma_max, CORR_KEY, ARTIF_ERR_KEY)
+                                 w_bw, sigma_max, k, CORR_KEY, ARTIF_ERR_KEY)
     return angles, vel, ctrl_unit
 
 
@@ -351,41 +351,47 @@ if __name__ == '__main__':
     I = np.array([[3379.4, 25.6, 3.2], [25.6, 9283.9, 19.6], [3.2, 19.6, 10578.5]])
 
     coef = 0.0001
-    acc_with_correction = []
-    acc_without_correction = []
+    acc_with_correction = [0] * 10
+    acc_without_correction = [0] * 10
     for i in range(1, 11):
         K = coef * i
-        for j in range(100):
+        n = 100
+        for j in range(n):
             [t, results, handles, P] = run(K, t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
                                 CORR_KEY=False,
                                 A_S_ERR_KEY=True,
                                 GIVUS_ERR_KEY=True,
                                 ARTIF_ERR_KEY=True)
-            n = len(t)
             results["Углы отклонения от заданной ориентации"] = \
                 [vector / k for vector in results["Углы отклонения от заданной ориентации"]]
             a = results["Углы отклонения от заданной ориентации"]
             a = a[len(a) - 1]
-            acc_without_correction[i] += a
+            acc_without_correction[i-1] += abs(a[0]) + abs(a[1]) + abs(a[2])
 
             [t, results, handles, P] = run(K, t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
                                            CORR_KEY=True,
                                            A_S_ERR_KEY=True,
                                            GIVUS_ERR_KEY=True,
                                            ARTIF_ERR_KEY=True)
-            n = len(t)
             results["Углы отклонения от заданной ориентации"] = \
                 [vector / k for vector in results["Углы отклонения от заданной ориентации"]]
             a = results["Углы отклонения от заданной ориентации"]
             a = a[len(a) - 1]
-            acc_with_correction[i] += a
-        acc_without_correction[i] /= 100
-        acc_with_correction[i] /= 100
+            acc_with_correction[i-1] += abs(a[0]) + abs(a[1]) + abs(a[2])
+
+        acc_without_correction[i-1] /= n
+        acc_with_correction[i-1] /= n
+        print('step', i, 'done')
 
     error_coef = [coef * i for i in range(1, 11)]
     fig = plt.figure(1)
-    plt.plot(error_coef, acc_without_correction, acc_with_correction)
-
+    plt.plot(error_coef, acc_without_correction)
+    plt.plot(error_coef, acc_with_correction)
+    plt.xlabel('Величина коэффициента вносимой ошибки')
+    plt.ylabel('Среднее значение суммарной ошибки, град')
+    plt.grid(True)
+    plt.legend(['Без астрокоррекции','С астрокоррекцией'])
+    plt.show()
 
     '''
     # отображение графиков

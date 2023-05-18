@@ -445,7 +445,7 @@ class ControlUnit:
             # стабилизация
             if self.flag == False:
                 self.flag = True
-                print(t, self.flag)
+                #print(t, self.flag)
             self.omega_delta = self.omega - self.omega_pr
             sigma = -(self.K1_st @ self.gamma + self.K2_st @ self.omega_delta)
             #sigma = sigma + np.sign(sigma)*0.0012
@@ -454,7 +454,7 @@ class ControlUnit:
             # перенацеливание
             if self.flag == True:
                 self.flag = False
-                print(t, self.flag)
+                #print(t, self.flag)
             # self.omega_delta = self.omega + self.K1_pt @ self.gamma
             # sigma = - self.K2_pt @ self.omega_delta
             sigma = -self.K1_pt @ self.gamma - self.K2_pt @ self.omega
