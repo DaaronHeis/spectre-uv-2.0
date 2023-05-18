@@ -47,6 +47,8 @@ def init_start_orientation(angles_0):
     """ Выставление начальной ориентации (сразу в виде кватерниона) """
     angles = angles_0.copy()
     l_0 = ctrl.from_euler_to_quat(angles, 'YZXr')
+    l_pr = qt.quaternion(0.86472620667614, 0.256908589358277, 0.334920502035886, 0.272166900113631)
+    l_0 = l_pr.inverse()
     print('l_0 = ', l_0)
     return l_0
 
@@ -355,9 +357,9 @@ if __name__ == '__main__':
     """
     [t, results, handles, P] = run(t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
                                 CORR_KEY=False,
-                                A_S_ERR_KEY=True,
-                                GIVUS_ERR_KEY=True,
-                                ARTIF_ERR_KEY=True)
+                                A_S_ERR_KEY=False,
+                                GIVUS_ERR_KEY=False,
+                                ARTIF_ERR_KEY=False)
 
     # отображение графиков
     n = len(t)
