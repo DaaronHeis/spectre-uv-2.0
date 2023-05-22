@@ -45,7 +45,7 @@ class Updater:
         Astro.set_current_orientation(self.L_KA, CU.is_stabilisation(), self.t)
 
         # интегрирование уравнения кинематики и астрокоррекция
-        CU.set_current_orientation(self.dt, Astro)
+        CU.set_current_orientation(self.dt, Astro, self.t)
         sigma = CU.get_control_moment(self.t)
 
         # получение параметров модулей и их вывод

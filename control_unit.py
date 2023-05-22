@@ -476,10 +476,10 @@ class ControlUnit:
     def is_stabilisation(self):
         return self.flag
 
-    def set_current_orientation(self, dt, astrosensor):
+    def set_current_orientation(self, dt, astrosensor, t):
         """ Вычисление кватерниона текущей ориентации путем интегрирования уравнений движения """
         omega = self.omega
-        if self.key_orient_error is True:
+        if self.key_orient_error is True and t > 10:
             self.add_error_in_orientation()
         if self.key_corr is True:
             self.get_correction(astrosensor)
@@ -500,8 +500,8 @@ class ControlUnit:
         проверки работы астрокоррекции
         """
         k = self.k
-        error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
-        #error_quat = qt.quaternion(1, k, -k, k)
+        #error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
+        error_quat = qt.quaternion(1, k, k, k)
         error_quat = error_quat.normalized()
         self.L_cur = self.L_cur*error_quat
 
