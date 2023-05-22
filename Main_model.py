@@ -87,7 +87,7 @@ def init_kalman(L_KA, L_pr, dt):
     Q = np.diag([1e-12, 1e-12, 1e-12])
     R = np.eye(3)
 
-    UKF = linear_kalman.UnscentedKalmanFilter(x, P, Q, R, dt, L_pr)
+    UKF = linear_kalman.LinearKalmanFilter(x, P, Q, R, dt, L_pr)
     return UKF
 
 
@@ -345,20 +345,20 @@ if __name__ == '__main__':
     # тензор инерции (данные из документации, не менять)
     I = np.array([[3379.4, 25.6, 3.2], [25.6, 9283.9, 19.6], [3.2, 19.6, 10578.5]])
 
-    coef = 0.00001
-    m = 101
+    coef = 0.000002
+    m = 50
     acc_with_correction = [0.0, 0.0, 0.0]
-    acc_with_correction[0] = [0.0] * (m-1)
-    acc_with_correction[1] = [0.0] * (m-1)
-    acc_with_correction[2] = [0.0] * (m-1)
+    acc_with_correction[0] = [0.0] * m
+    acc_with_correction[1] = [0.0] * m
+    acc_with_correction[2] = [0.0] * m
     acc_without_correction = [0.0, 0.0, 0.0]
-    acc_without_correction[0] = [0.0] * (m-1)
-    acc_without_correction[1] = [0.0] * (m-1)
-    acc_without_correction[2] = [0.0] * (m-1)
+    acc_without_correction[0] = [0.0] * m
+    acc_without_correction[1] = [0.0] * m
+    acc_without_correction[2] = [0.0] * m
     print('started modelling...')
-    for i in range(1, m):
+    for i in range(1, m+1):
         K = coef * i
-        n = 50
+        n = 100
         for j in range(n):
             [t, results, handles, P] = run(K, t_span, dt, angles_0, angles_end, vel_0, vel_end, M, I,
                                 CORR_KEY=False,
@@ -398,17 +398,19 @@ if __name__ == '__main__':
         print('step', i, 'done...')
 
     print('Done!')
-    error_coef = [coef * i for i in range(1, m)]
+    error_coef = [coef * i for i in range(1, m+1)]
+    astrosensor_error = [30 / 3600 * 2] * len(error_coef)
     for i in range(3):
         fig = plt.figure(i+1)
         a = acc_without_correction[i]
         b = acc_with_correction[i]
         plt.plot(error_coef, acc_without_correction[i])
         plt.plot(error_coef, acc_with_correction[i])
+        plt.plot(error_coef, astrosensor_error, linestyle='--')
         plt.xlabel('Величина коэффициента вносимой ошибки')
         plt.ylabel('Среднее значение ошибки, град')
         plt.grid(True)
-        plt.legend(['Без астрокоррекции','С астрокоррекцией'])
+        plt.legend(['Без астрокоррекции','С астрокоррекцией','Погрешность астродатчика'])
         if i == 0:
             plt.title('Ошибка по крену')
         elif i == 1:
@@ -431,12 +433,12 @@ if __name__ == '__main__':
         [vector/k for vector in results["Зашумленные проекции вектора угловой скорости на оси ССК"]]"""
     results["Угловая скорость коррекции"] = \
         [vector / k for vector in results["Угловая скорость коррекции"]]
-
+    '''
     # с этого момента все углы в градусах
 
     print("Матрица ковариации фильтра Калмана")
     print(P)
-
+    '''
     a = results["Углы отклонения от заданной ориентации"]
     a = a[len(a)-1]
     roll = deg2sec(a[0])
@@ -455,7 +457,6 @@ if __name__ == '__main__':
     print("    Ошибка ориентации по углу отклонения        ")
     print(str(angle[0])+" град "+str(angle[1])+"' "+str(angle[2])+'"')
     print("------------------------------------------------")
-
     i = 1
     for u in results.keys():
         fig = plt.figure(i)
@@ -475,3 +476,4 @@ if __name__ == '__main__':
         i += 1
     plt.show()
     '''
+

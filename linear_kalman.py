@@ -26,16 +26,12 @@
         - обновляется достоверность состояния на основе точности измерения
 """
 
-# TODO: переписать как линейный (функционал уже как у линейного, осталось только оформить красиво)
 
 import numpy as np
 import quaternion as qt
-from scipy.linalg import cholesky 
-from control_unit import from_euler_to_quat
-from control_unit import integrate_angular_velocity
 
 
-class UnscentedKalmanFilter:
+class LinearKalmanFilter:
     """
         Раньше был реализован нелинейный вариант, после совещания с научником
         было решено реализовать линейную модель

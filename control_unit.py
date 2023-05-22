@@ -500,10 +500,16 @@ class ControlUnit:
         проверки работы астрокоррекции
         """
         k = self.k
-        #error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
+        '''
+        error_quat = qt.quaternion(1, k*random.choice([-1, 1]), k*random.choice([-1, 1]), k*random.choice([-1, 1]))
         error_quat = qt.quaternion(1, k, k, k)
         error_quat = error_quat.normalized()
         self.L_cur = self.L_cur*error_quat
+        '''
+        self.L_cur.x += k
+        self.L_cur.y += k
+        self.L_cur.z += k
+        self.L_cur = self.L_cur.normalized()
 
     def get_parameters(self):
         """
